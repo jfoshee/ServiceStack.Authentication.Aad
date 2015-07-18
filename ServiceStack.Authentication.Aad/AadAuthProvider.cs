@@ -7,7 +7,7 @@ namespace ServiceStack.Authentication.Aad
     {
         public override bool IsAuthorized(IAuthSession session, IAuthTokens tokens, Authenticate request = null)
         {
-            throw new NotImplementedException();
+            return true;
         }
 
         public override object Authenticate(IServiceBase authService, IAuthSession session, Authenticate request)

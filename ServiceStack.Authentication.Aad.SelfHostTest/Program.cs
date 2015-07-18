@@ -11,7 +11,7 @@ namespace ServiceStack.Authentication.Aad.SelfHostTest
             var port = 8088;
             new AppHost().Init().Start("http://*:{0}/".Fmt(port));
             "ServiceStack SelfHost listening at http://localhost:{0}".Fmt(port).Print();
-            Process.Start("http://localhost:{0}".Fmt(port));
+            Process.Start("http://localhost:{0}/secure".Fmt(port));
             Console.ReadLine();
         }
     }
