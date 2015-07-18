@@ -11,6 +11,9 @@ namespace ServiceStack.Authentication.Aad.Tests
         {
             var subject = new AadAuthProvider();
             subject.Should().BeAssignableTo<AuthProvider>();
+            subject.Provider.Should().Be("aad");
         }
+
+        // TODO: Some meaningful unit tests...
     }
 }
