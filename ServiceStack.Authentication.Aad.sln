@@ -6,6 +6,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ServiceStack.Authentication
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ServiceStack.Authentication.Aad.Tests", "ServiceStack.Authentication.Aad.Tests\ServiceStack.Authentication.Aad.Tests.csproj", "{483AF7BE-AC38-4C6C-A798-6F69EE6F6801}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ServiceStack.Authentication.Aad.SelfHostTest", "ServiceStack.Authentication.Aad.SelfHostTest\ServiceStack.Authentication.Aad.SelfHostTest.csproj", "{EA80C452-414C-4481-9C1D-17B8CB7D262C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -20,6 +22,10 @@ Global
 		{483AF7BE-AC38-4C6C-A798-6F69EE6F6801}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{483AF7BE-AC38-4C6C-A798-6F69EE6F6801}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{483AF7BE-AC38-4C6C-A798-6F69EE6F6801}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EA80C452-414C-4481-9C1D-17B8CB7D262C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EA80C452-414C-4481-9C1D-17B8CB7D262C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EA80C452-414C-4481-9C1D-17B8CB7D262C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EA80C452-414C-4481-9C1D-17B8CB7D262C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
