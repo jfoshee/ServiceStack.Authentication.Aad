@@ -1,18 +1,19 @@
 ﻿using ServiceStack.Auth;
+using ServiceStack.Configuration;
+using ServiceStack.Text;
 using System;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens;
 using System.Net;
 using System.Text;
-using ServiceStack.Configuration;
-using ServiceStack.Text;
 
-// This is a big work in progress...
+// This is still a work in progress...
 
 namespace ServiceStack.Authentication.Aad
 {
     /// <summary>
     /// Azure Active Directory Auth Provider
+    /// See: https://msdn.microsoft.com/en-us/library/azure/dn645542.aspx
     /// </summary>
     public class AadAuthProvider : OAuthProvider
     {
@@ -22,9 +23,16 @@ namespace ServiceStack.Authentication.Aad
 
         public string TenantId { get; set; }
 
-        public string ClientId { get; set; }
+        public string ClientId
+        {
+            get { return ConsumerKey; }
+            set { ConsumerKey = value; }
+        }
 
-        public string ClientSecret { get; set; }
+        public string ClientSecret {
+            get { return ConsumerSecret; }
+            set { ConsumerSecret = value; }
+        }
 
         public string[] Scopes { get; set; }
 
@@ -37,18 +45,27 @@ namespace ServiceStack.Authentication.Aad
         public AadAuthProvider(IAppSettings appSettings)
             : base(appSettings, Realm, Name, "ClientId", "ClientSecret")
         {
-            ClientId = appSettings.GetString("oauth.aad.ClientId");
-            ClientSecret = appSettings.GetString("oauth.aad.ClientSecret");
-            TenantId = appSettings.GetString("oauth.aad.TenantId");
-            AccessTokenUrl = Realm + TenantId + "/oauth2/token";
+            // To get the authorization code, the web browser (or an embedded web browser 
+            // control) navigates to a tenant-specific or common (tenant-independent) endpoint.
+            TenantId = appSettings.Get("oauth.{0}.TenantId".Fmt(Provider), "common");
+            var baseAuthUrl = Realm + TenantId + "/oauth2/";
+            AuthorizeUrl = appSettings.Get("oauth.{0}.AuthorizeUrl".Fmt(Provider), baseAuthUrl + "authorize");
+            AccessTokenUrl = appSettings.Get("oauth.{0}.AccessTokenUrl".Fmt(Provider), baseAuthUrl + "token");
+            // TODO: Note that RequestTokenUrl is not used... 
             Scopes = appSettings.Get("oauth.aad.Scopes", new[] { "user_impersonation" });
         }
 
         public override object Authenticate(IServiceBase authService, IAuthSession session, Authenticate request)
         {
+            // TODO: WARN: Property 'code' does not exist on type 'ServiceStack.Authenticate'
+            // TODO: WARN: Property 'session_state' does not exist on type 'ServiceStack.Authenticate'
 
             var tokens = Init(authService, ref session, request);
             var httpRequest = authService.Request;
+
+            // 1. The client application starts the flow by redirecting the user agent 
+            //    to the Azure AD authorization endpoint. The user authenticates and 
+            //    consents, if consent is required.
 
             //https://developer.github.com/v3/oauth/#common-errors-for-the-authorization-request
             var error = httpRequest.QueryString["error"]
@@ -62,62 +79,49 @@ namespace ServiceStack.Authentication.Aad
                 return authService.Redirect(FailedRedirectUrlFilter(this, session.ReferrerUrl.SetParam("f", error)));
             }
 
+            // STEP 1: Request Code
             var code = httpRequest.QueryString["code"];
             var isPreAuthCallback = !code.IsNullOrEmpty();
             if (!isPreAuthCallback)
             {
                 string preAuthUrl = PreAuthUrl.Fmt(TenantId) + "?client_id={0}&redirect_uri={1}&scope={2}&state={3}&response_type=code"
                     .Fmt(ClientId, CallbackUrl.UrlEncode(), Scopes.Join(","), Guid.NewGuid().ToString("N"));
-
+                
                 authService.SaveSession(session, SessionExpiry);
                 return authService.Redirect(PreAuthUrlFilter(this, preAuthUrl));
             }
 
-
-            string accessTokenUrl = AccessTokenUrl + "?client_id={0}&redirect_uri={1}&client_secret={2}&code={3}"
-                .Fmt(ClientId, CallbackUrl.UrlEncode(), ClientSecret, code);
+            // 2. The Azure AD authorization endpoint redirects the user agent back 
+            //    to the client application with an authorization code. The user 
+            //    agent returns authorization code to the client application’s redirect URI.
+            // 3. The client application requests an access token from the 
+            //    Azure AD token issuance endpoint. It presents the authorization code 
+            //    to prove that the user has consented.
+            // STEP 2: Request Token
             var formData = "client_id={0}&redirect_uri={1}&client_secret={2}&code={3}&grant_type=authorization_code&resource=00000002-0000-0000-c000-000000000000"
                 .Fmt(ClientId, CallbackUrl.UrlEncode(), ClientSecret.UrlEncode(), code);
-
             try
             {
                 // Endpoint only accepts posts requests
                 var contents = AccessTokenUrl.PostToUrl(formData);
-                //    , "*/*", null, response =>
-                //{
-                //    response.PrintDump();
-                //});
-                //    new
-                //{
-                //    client_id = ClientId.UrlEncode(),
-                //    client_secret = ClientSecret.UrlEncode(),
-                //    code = code,
-                //    grant_type = "authorization_code",
-                //    redirect_uri = CallbackUrl.UrlEncode(),
-                //    resource = "00000002-0000-0000-c000-000000000000" // [Optional] The App ID URI of the web API (secured resource).
-                //});
 
-                //var contents = AccessTokenUrlFilter(this, accessTokenUrl).PostToUrl(null);
+                // 4. The Azure AD token issuance endpoint returns an access token 
+                //    and a refresh token. The refresh token can be used to request 
+                //    additional access tokens.
 
                 // Response is JSON
                 var authInfo = JsonObject.Parse(contents);
-                //var authInfo = HttpUtility.ParseQueryString(contents);
-
-                //GitHub does not throw exception, but just return error with descriptions
-                //https://developer.github.com/v3/oauth/#common-errors-for-the-access-token-request
                 var accessTokenError = authInfo["error"]
                                        ?? authInfo["error_uri"]
                                        ?? authInfo["error_description"];
-
                 if (!accessTokenError.IsNullOrEmpty())
                 {
-                    Log.Error("GitHub access_token error callback. {0}".Fmt(authInfo.ToString()));
+                    Log.Error("access_token error callback. {0}".Fmt(authInfo.ToString()));
                     return authService.Redirect(FailedRedirectUrlFilter(this, session.ReferrerUrl.SetParam("f", "AccessTokenFailed")));
                 }
+                // TODO: Validate matching `state`
                 tokens.AccessTokenSecret = authInfo["access_token"];
-
                 session.IsAuthenticated = true;
-
                 return OnAuthenticated(authService, session, tokens, authInfo.ToDictionary())
                        ?? authService.Redirect(SuccessRedirectUrlFilter(this, session.ReferrerUrl.SetParam("s", "1"))); //Haz Access!
             }
@@ -128,59 +132,39 @@ namespace ServiceStack.Authentication.Aad
                 var responseText = Encoding.UTF8.GetString(
                     response.GetResponseStream().ReadFully());
                 Log.Error(responseText);
-                //just in case GitHub will start throwing exceptions 
-                var statusCode = ((HttpWebResponse)webException.Response).StatusCode;
+
+                var statusCode = response.StatusCode;
                 if (statusCode == HttpStatusCode.BadRequest)
                 {
                     return authService.Redirect(FailedRedirectUrlFilter(this, session.ReferrerUrl.SetParam("f", "AccessTokenFailed")));
                 }
             }
             return authService.Redirect(FailedRedirectUrlFilter(this, session.ReferrerUrl.SetParam("f", "Unknown")));
-
-        }
-
-        /// <summary>
-        ///   Calling to Github API without defined Useragent throws
-        ///   exception "The server committed a protocol violation. Section=ResponseStatusLine"
-        /// </summary>
-        protected virtual void UserRequestFilter(HttpWebRequest request)
-        {
-            request.UserAgent = ServiceClientBase.DefaultUserAgent;
         }
 
         protected override void LoadUserAuthInfo(AuthUserSession userSession, IAuthTokens tokens, Dictionary<string, string> authInfo)
         {
             try
             {
-                // TODO: Figure out user info URL
-                //var json = "https://login.microsoftonline.com/fe23e5c3-19be-467d-8a25-4bc12004ee65/user?access_token={0}".Fmt(tokens.AccessTokenSecret)
-                //    .GetStringFromUrl("*/*", UserRequestFilter);
-                //var obj = JsonObject.Parse(json);
-
+                // The id_token is a JWT token. See http://jwt.io
                 var jwt = new JwtSecurityToken(authInfo["id_token"]);
+                // TODO: Validate JWT is signed in expected way
                 var p = jwt.Payload;
-                tokens.UserId = (string)p["oid"];  //obj.Get("id");
-                tokens.UserName = (string) p["upn"]; //obj.Get("login");
-                tokens.DisplayName = (string) p["name"]; //obj.Get("name");
-                //tokens.Email = (string) p["email"]; // obj.Get("email");
+                tokens.UserId = (string)p["oid"];
+                tokens.UserName = (string) p["upn"];
+                tokens.DisplayName = (string) p["name"];
+                //tokens.Email = (string) p["email"];
                 //tokens.Company = obj.Get("company");
                 //tokens.Country = obj.Get("country");
-
                 //if (SaveExtendedUserInfo)
                 //{
                 //    obj.Each(x => authInfo[x.Key] = x.Value);
                 //}
-
-                //string profileUrl;
-                //if (obj.TryGetValue("avatar_url", out profileUrl))
-                //    tokens.Items[AuthMetadataProvider.ProfileUrlKey] = profileUrl;
             }
             catch (Exception ex)
             {
                 Log.Error("Could not retrieve user info", ex);
-                //Log.Error("Could not retrieve github user info for '{0}'".Fmt(tokens.DisplayName), ex);
             }
-
             LoadUserOAuthProvider(userSession, tokens);
         }
 
