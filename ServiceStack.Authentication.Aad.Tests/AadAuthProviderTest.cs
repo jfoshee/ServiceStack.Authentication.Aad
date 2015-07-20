@@ -80,7 +80,6 @@ namespace ServiceStack.Authentication.Aad.Tests
             using (var appHost = new BasicAppHost(typeof (Service).Assembly).Init())
             {
                 Subject.ClientId = "2d4d11a2-f814-46a7-890a-274a72a7309e";
-                Subject.ClientSecret = "s34";
                 Subject.CallbackUrl = "http://localhost/myapp/";
                 // TODO: It is confusing that there is a CallbackUrl and a RedirectUrl
                 var mockAuthService = new Mock<IServiceBase>();

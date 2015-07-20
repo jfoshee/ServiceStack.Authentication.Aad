@@ -59,7 +59,7 @@ namespace ServiceStack.Authentication.Aad
         {
             // TODO: WARN: Property 'code' does not exist on type 'ServiceStack.Authenticate'
             // TODO: WARN: Property 'session_state' does not exist on type 'ServiceStack.Authenticate'
-
+            // TODO: The Init function sets up the CallbackUrl if it is not present which would be ok *if* it stripped the paramlist
             var tokens = Init(authService, ref session, request);
             var httpRequest = authService.Request;
 
@@ -122,6 +122,7 @@ namespace ServiceStack.Authentication.Aad
                 // TODO: Validate matching `state`
                 tokens.AccessTokenSecret = authInfo["access_token"];
                 session.IsAuthenticated = true;
+                // TODO: Redirect the user where they wanted to go in the first place (redirect param in initial auth request)
                 return OnAuthenticated(authService, session, tokens, authInfo.ToDictionary())
                        ?? authService.Redirect(SuccessRedirectUrlFilter(this, session.ReferrerUrl.SetParam("s", "1"))); //Haz Access!
             }
