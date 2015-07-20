@@ -18,9 +18,9 @@ namespace ServiceStack.Authentication.Aad
     public class AadAuthProvider : OAuthProvider
     {
         public const string Name = "aad";
-        public static string Realm = "https://login.microsoftonline.com/";        
-        public static string PreAuthUrl = "https://login.microsoftonline.com/{0}/oauth2/authorize";
+        public static string Realm = "https://login.microsoftonline.com/";
 
+        // TODO: Update AuthorizeUrl and AccessTokenUrl when TenantId changed
         public string TenantId { get; set; }
 
         public string ClientId
@@ -84,9 +84,8 @@ namespace ServiceStack.Authentication.Aad
             var isPreAuthCallback = !code.IsNullOrEmpty();
             if (!isPreAuthCallback)
             {
-                string preAuthUrl = PreAuthUrl.Fmt(TenantId) + "?client_id={0}&redirect_uri={1}&scope={2}&state={3}&response_type=code"
+                string preAuthUrl = AuthorizeUrl + "?response_type=code&client_id={0}&redirect_uri={1}&scope={2}&state={3}"
                     .Fmt(ClientId, CallbackUrl.UrlEncode(), Scopes.Join(","), Guid.NewGuid().ToString("N"));
-                
                 authService.SaveSession(session, SessionExpiry);
                 return authService.Redirect(PreAuthUrlFilter(this, preAuthUrl));
             }
@@ -97,6 +96,7 @@ namespace ServiceStack.Authentication.Aad
             // 3. The client application requests an access token from the 
             //    Azure AD token issuance endpoint. It presents the authorization code 
             //    to prove that the user has consented.
+
             // STEP 2: Request Token
             var formData = "client_id={0}&redirect_uri={1}&client_secret={2}&code={3}&grant_type=authorization_code&resource=00000002-0000-0000-c000-000000000000"
                 .Fmt(ClientId, CallbackUrl.UrlEncode(), ClientSecret.UrlEncode(), code);
@@ -132,7 +132,7 @@ namespace ServiceStack.Authentication.Aad
                 var responseText = Encoding.UTF8.GetString(
                     response.GetResponseStream().ReadFully());
                 Log.Error(responseText);
-
+                // TODO: Error response is JSON. Can get error code and description
                 var statusCode = response.StatusCode;
                 if (statusCode == HttpStatusCode.BadRequest)
                 {
@@ -153,9 +153,11 @@ namespace ServiceStack.Authentication.Aad
                 tokens.UserId = (string)p["oid"];
                 tokens.UserName = (string) p["upn"];
                 tokens.DisplayName = (string) p["name"];
+                // TODO: Get Email address
                 //tokens.Email = (string) p["email"];
                 //tokens.Company = obj.Get("company");
                 //tokens.Country = obj.Get("country");
+                // TODO: Save other payload info
                 //if (SaveExtendedUserInfo)
                 //{
                 //    obj.Each(x => authInfo[x.Key] = x.Value);

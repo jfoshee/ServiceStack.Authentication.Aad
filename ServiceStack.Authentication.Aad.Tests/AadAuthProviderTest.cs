@@ -1,8 +1,11 @@
-﻿using System.Collections.Generic;
-using FluentAssertions;
+﻿using FluentAssertions;
+using Moq;
 using NUnit.Framework;
 using ServiceStack.Auth;
 using ServiceStack.Configuration;
+using ServiceStack.Testing;
+using ServiceStack.Web;
+using System.Collections.Generic;
 
 namespace ServiceStack.Authentication.Aad.Tests
 {
@@ -66,6 +69,29 @@ namespace ServiceStack.Authentication.Aad.Tests
         {
             Subject.AuthorizeUrl.Should().Be("https://login.microsoftonline.com/common/oauth2/authorize");
             Subject.AccessTokenUrl.Should().Be("https://login.microsoftonline.com/common/oauth2/token");
+        }
+
+        [Test]
+        public void ShouldRequestCode()
+        {
+            //HostConfig.ResetInstance();
+            //HostConfig.Instance.WebHostUrl = "http://localhost";
+            // TODO: Do I really need to create an apphost so that it won't die trying to get the base URL?
+            using (var appHost = new BasicAppHost(typeof (Service).Assembly).Init())
+            {
+                Subject.ClientId = "2d4d11a2-f814-46a7-890a-274a72a7309e";
+                Subject.ClientSecret = "s34";
+                Subject.CallbackUrl = "http://localhost/myapp/";
+                // TODO: It is confusing that there is a CallbackUrl and a RedirectUrl
+                var mockAuthService = new Mock<IServiceBase>();
+                mockAuthService.SetupGet(s => s.Request).Returns(new MockHttpRequest());
+
+                var response = Subject.Authenticate(mockAuthService.Object, new AuthUserSession(), new Authenticate());
+
+                var result = (IHttpResult) response;
+                result.Headers["Location"].Should().StartWith(
+                    "https://login.microsoftonline.com/common/oauth2/authorize?response_type=code&client_id=2d4d11a2-f814-46a7-890a-274a72a7309e&redirect_uri=http%3a%2f%2flocalhost%2fmyapp%2f");
+            }
         }
 
         // TODO: More meaningful unit tests...
