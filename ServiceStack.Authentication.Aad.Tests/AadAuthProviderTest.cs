@@ -74,6 +74,18 @@ namespace ServiceStack.Authentication.Aad.Tests
             Subject.AccessTokenUrl.Should().Be("https://login.microsoftonline.com/common/oauth2/token");
         }
 
+        [Test]
+        public void ShouldUpdateEndpointsWhenTenantIdChanged()
+        {
+            Subject.TenantId = "tid123";
+            Subject.AuthorizeUrl.Should().Be("https://login.microsoftonline.com/tid123/oauth2/authorize");
+            Subject.AccessTokenUrl.Should().Be("https://login.microsoftonline.com/tid123/oauth2/token");
+            Subject.TenantId = String.Empty;
+            ShouldUseCommonEndpointWhenTenantIdMissing();
+            Subject.TenantId = null;
+            ShouldUseCommonEndpointWhenTenantIdMissing();
+        }
+
         // Tests based on examples at https://msdn.microsoft.com/en-us/library/azure/dn645542.aspx
 
         [Test]
@@ -121,7 +133,7 @@ namespace ServiceStack.Authentication.Aad.Tests
                             "https://login.microsoftonline.com/common/oauth2/token");
                         tokenRequest.Method.Should().Be("POST");
                         tokenRequest.ContentType.Should().Be("application/x-www-form-urlencoded");
-                        // TODO: Test form data
+                        // TODO: Test form data. Seems impossible: http://stackoverflow.com/questions/31630526/can-i-test-form-data-using-httpresultsfilter-callback
                         //formData["client_id"].Should().Be(Subject.ClientId);
                         //formData["redirect_uri"]
                         return 
@@ -139,7 +151,9 @@ namespace ServiceStack.Authentication.Aad.Tests
                 })
                 {
                     var session = new AuthUserSession();
+
                     var response = Subject.Authenticate(mockAuthService.Object, session, new Authenticate());
+
                     session.IsAuthenticated.Should().BeTrue();
                     var tokens = session.GetOAuthTokens("aad");
                     tokens.Provider.Should().Be("aad");
@@ -158,7 +172,6 @@ namespace ServiceStack.Authentication.Aad.Tests
                     var result = (IHttpResult) response;
                     result.Headers["Location"].Should().StartWith(
                         "http://localhost#s=1");
-                    // TODO: Redirect to original request
                 }
             }
         }
@@ -178,6 +191,54 @@ namespace ServiceStack.Authentication.Aad.Tests
                 Subject.Authenticate(mockAuthService.Object, session, new Authenticate());
 
                 session.ReferrerUrl.Should().Be("http://localhost/myapp/secure-resource");
+            }
+        }
+
+        [Test]
+        public void ShouldNotAuthenticateIfTenantIdNotMatched()
+        {
+            Subject.ClientId = "2d4d11a2-f814-46a7-890a-274a72a7309e";
+            Subject.TenantId = "different";
+            VerifyNotAuthenticatedByToken();
+        }
+
+        [Test]
+        public void ShouldNotAuthenticateIfClientIdNotMatched()
+        {
+            Subject.ClientId = "different";
+            VerifyNotAuthenticatedByToken();
+        }
+
+        private void VerifyNotAuthenticatedByToken()
+        {
+            Subject.CallbackUrl = "http://localhost/myapp/";
+            using (TestAppHost())
+            {
+                var request = new MockHttpRequest("myapp", "GET", "text", "/myapp", new NameValueCollection
+                {
+                    {"code", "code123"},
+                    {"state", "D79E5777-702E-4260-9A62-37F75FF22CCE"}
+                }, Stream.Null, null);
+                var mockAuthService = MockAuthService(request);
+                using (new HttpResultsFilter
+                {
+                    StringResult =
+                        @"{
+                          ""access_token"": ""token456"",
+                          ""id_token"": ""eyJ0eXAiOiJKV1QiLCJhbGciOiJub25lIn0.eyJhdWQiOiIyZDRkMTFhMi1mODE0LTQ2YTctODkwYS0yNzRhNzJhNzMwOWUiLCJpc3MiOiJodHRwczovL3N0cy53aW5kb3dzLm5ldC83ZmU4MTQ0Ny1kYTU3LTQzODUtYmVjYi02ZGU1N2YyMTQ3N2UvIiwiaWF0IjoxMzg4NDQwODYzLCJuYmYiOjEzODg0NDA4NjMsImV4cCI6MTM4ODQ0NDc2MywidmVyIjoiMS4wIiwidGlkIjoiN2ZlODE0NDctZGE1Ny00Mzg1LWJlY2ItNmRlNTdmMjE0NzdlIiwib2lkIjoiNjgzODlhZTItNjJmYS00YjE4LTkxZmUtNTNkZDEwOWQ3NGY1IiwidXBuIjoiZnJhbmttQGNvbnRvc28uY29tIiwidW5pcXVlX25hbWUiOiJmcmFua21AY29udG9zby5jb20iLCJzdWIiOiJKV3ZZZENXUGhobHBTMVpzZjd5WVV4U2hVd3RVbTV5elBtd18talgzZkhZIiwiZmFtaWx5X25hbWUiOiJNaWxsZXIiLCJnaXZlbl9uYW1lIjoiRnJhbmsifQ.""
+                        }"
+                })
+                {
+                    var session = new AuthUserSession();
+                    try
+                    {
+                        Subject.Authenticate(mockAuthService.Object, session, new Authenticate());
+                    }
+                    catch (UnauthorizedAccessException)
+                    {
+                    }
+                    session.IsAuthenticated.Should().BeFalse();
+                }
             }
         }
 

@@ -20,8 +20,30 @@ namespace ServiceStack.Authentication.Aad
         public const string Name = "aad";
         public static string Realm = "https://login.microsoftonline.com/";
 
-        // TODO: Update AuthorizeUrl and AccessTokenUrl when TenantId changed
-        public string TenantId { get; set; }
+        public string BaseAuthUrl
+        {
+            get
+            {
+                var tenantId = String.IsNullOrEmpty(TenantId) ? "common" : TenantId;
+                return Realm + tenantId + "/oauth2/";
+            }
+        }
+        public IAppSettings AppSettings { get; private set; }
+
+        private string _tenantId;
+        public string TenantId
+        {
+            get { return _tenantId; }
+            set
+            {
+                _tenantId = value;
+                // To get the authorization code, the web browser (or an embedded web browser 
+                // control) navigates to a tenant-specific or common (tenant-independent) endpoint.
+                AuthorizeUrl = AppSettings.Get("oauth.{0}.AuthorizeUrl".Fmt(Provider), BaseAuthUrl + "authorize");
+                AccessTokenUrl = AppSettings.Get("oauth.{0}.AccessTokenUrl".Fmt(Provider), BaseAuthUrl + "token");
+                // TODO: Note that RequestTokenUrl is not used... 
+            }
+        }
 
         public string ClientId
         {
@@ -45,14 +67,9 @@ namespace ServiceStack.Authentication.Aad
         public AadAuthProvider(IAppSettings appSettings)
             : base(appSettings, Realm, Name, "ClientId", "ClientSecret")
         {
-            // To get the authorization code, the web browser (or an embedded web browser 
-            // control) navigates to a tenant-specific or common (tenant-independent) endpoint.
-            TenantId = appSettings.Get("oauth.{0}.TenantId".Fmt(Provider), "common");
-            var baseAuthUrl = Realm + TenantId + "/oauth2/";
-            AuthorizeUrl = appSettings.Get("oauth.{0}.AuthorizeUrl".Fmt(Provider), baseAuthUrl + "authorize");
-            AccessTokenUrl = appSettings.Get("oauth.{0}.AccessTokenUrl".Fmt(Provider), baseAuthUrl + "token");
-            // TODO: Note that RequestTokenUrl is not used... 
-            Scopes = appSettings.Get("oauth.aad.Scopes", new[] { "user_impersonation" });
+            AppSettings = appSettings;
+            TenantId = AppSettings.Get<string>("oauth.{0}.TenantId".Fmt(Provider), null);
+            Scopes = AppSettings.Get("oauth.{0}.Scopes", new[] { "user_impersonation" });
         }
 
         protected override string GetReferrerUrl(IServiceBase authService, IAuthSession session, Authenticate request = null)
@@ -129,8 +146,10 @@ namespace ServiceStack.Authentication.Aad
                 // TODO: Validate matching `state`
                 tokens.AccessTokenSecret = authInfo["access_token"];
                 tokens.RefreshToken = authInfo["refresh_token"];
-                tokens.RefreshTokenExpiry = authInfo["expires_on"].ToInt64().FromUnixTime();
-                session.IsAuthenticated = true;
+                var expiresOn = authInfo["expires_on"];
+                if (expiresOn != null)
+                    tokens.RefreshTokenExpiry = expiresOn.ToInt64().FromUnixTime();
+                //session.IsAuthenticated = true;
                 return OnAuthenticated(authService, session, tokens, authInfo.ToDictionary())
                        ?? authService.Redirect(SuccessRedirectUrlFilter(this, session.ReferrerUrl.SetParam("s", "1"))); //Haz Access!
             }
@@ -158,9 +177,19 @@ namespace ServiceStack.Authentication.Aad
                 var jwt = new JwtSecurityToken(authInfo["id_token"]);
                 // TODO: Validate JWT is signed in expected way
                 // TODO: Validate aud is ClientID
-                // TODO: Validate tid is TenantID (if not common)
-                // TODO: Handle missing keys
+                
                 var p = jwt.Payload;
+                var tenantId = (string) p["tid"];
+                if (!String.IsNullOrEmpty(TenantId) && TenantId != tenantId)
+                {
+                    userSession.IsAuthenticated = false;
+                    throw new UnauthorizedAccessException("Mismatched Tenant ID in JWT token");
+                }
+                if (!p.Aud.Contains(ClientId))
+                {
+                    userSession.IsAuthenticated = false;
+                    throw new UnauthorizedAccessException("Mismatched Client ID in JWT token");                    
+                }
                 tokens.UserId = (string) p["oid"];
                 tokens.UserName = (string) p["upn"];
                 tokens.LastName = (string) p.GetValueOrDefault("family_name");
@@ -177,9 +206,10 @@ namespace ServiceStack.Authentication.Aad
                 //    obj.Each(x => authInfo[x.Key] = x.Value);
                 //}
             }
-            catch (Exception ex)
+            catch (KeyNotFoundException ex)
             {
-                Log.Error("Could not retrieve user info", ex);
+                Log.Error("Could not retrieve user info at expected key", ex);
+                throw;
             }
             LoadUserOAuthProvider(userSession, tokens);
         }
