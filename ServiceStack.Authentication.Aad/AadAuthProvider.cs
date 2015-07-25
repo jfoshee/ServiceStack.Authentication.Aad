@@ -55,6 +55,13 @@ namespace ServiceStack.Authentication.Aad
             Scopes = appSettings.Get("oauth.aad.Scopes", new[] { "user_impersonation" });
         }
 
+        protected override string GetReferrerUrl(IServiceBase authService, IAuthSession session, Authenticate request = null)
+        {
+            // TODO: The base implementation should check the redirect param. Also this is interesting: http://english.stackexchange.com/questions/42630/referer-or-referrer
+            return authService.Request.GetParam("redirect") ??
+                base.GetReferrerUrl(authService, session, request);
+        }
+
         public override object Authenticate(IServiceBase authService, IAuthSession session, Authenticate request)
         {
             // TODO: WARN: Property 'code' does not exist on type 'ServiceStack.Authenticate'
@@ -124,7 +131,6 @@ namespace ServiceStack.Authentication.Aad
                 tokens.RefreshToken = authInfo["refresh_token"];
                 tokens.RefreshTokenExpiry = authInfo["expires_on"].ToInt64().FromUnixTime();
                 session.IsAuthenticated = true;
-                // TODO: Redirect the user where they wanted to go in the first place (redirect param in initial auth request)
                 return OnAuthenticated(authService, session, tokens, authInfo.ToDictionary())
                        ?? authService.Redirect(SuccessRedirectUrlFilter(this, session.ReferrerUrl.SetParam("s", "1"))); //Haz Access!
             }
@@ -136,8 +142,7 @@ namespace ServiceStack.Authentication.Aad
                     response.GetResponseStream().ReadFully());
                 Log.Error(responseText);
                 // TODO: Error response is JSON. Can get error code and description
-                var statusCode = response.StatusCode;
-                if (statusCode == HttpStatusCode.BadRequest)
+                if (webException.IsBadRequest())
                 {
                     return authService.Redirect(FailedRedirectUrlFilter(this, session.ReferrerUrl.SetParam("f", "AccessTokenFailed")));
                 }

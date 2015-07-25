@@ -79,14 +79,12 @@ namespace ServiceStack.Authentication.Aad.Tests
         [Test]
         public void ShouldRequestCode()
         {
-            // TODO: Do I really need to create an apphost so that it won't die trying to get the base URL?
-            using (var appHost = new BasicAppHost(typeof (Service).Assembly).Init())
+            using (TestAppHost())
             {
                 Subject.ClientId = "2d4d11a2-f814-46a7-890a-274a72a7309e";
                 Subject.CallbackUrl = "http://localhost/myapp/";
                 // TODO: It is confusing that there is a CallbackUrl and a RedirectUrl
-                var mockAuthService = new Mock<IServiceBase>();
-                mockAuthService.SetupGet(s => s.Request).Returns(new MockHttpRequest());
+                var mockAuthService = MockAuthService();
 
                 var response = Subject.Authenticate(mockAuthService.Object, new AuthUserSession(), new Authenticate());
 
@@ -102,19 +100,17 @@ namespace ServiceStack.Authentication.Aad.Tests
             // When an application sends a GET request for an authorization code, Azure AD sends a response to the
             // value of the redirect_uri parameter in the request. The response includes the following parameters:
             //      [admin_consent], code, session_state, state
-            using (var appHost = new BasicAppHost(typeof(Service).Assembly).Init())
+            using (TestAppHost())
             {
                 Subject.ClientId = "2d4d11a2-f814-46a7-890a-274a72a7309e";
                 // TODO: Subject.TenantId
                 Subject.CallbackUrl = "http://localhost/myapp/";
-                // TODO: It is confusing that there is a CallbackUrl and a RedirectUrl
-                var mockAuthService = new Mock<IServiceBase>();
                 var request = new MockHttpRequest("myapp", "GET", "text", "/myapp", new NameValueCollection {
                     {"code", "AwABAAAAvPM1KaPlrEqdFSBzjqfTGBCmLdgfSTLEMPGYuNHSUYBrqqf_ZT_p5uEAEJJ_nZ3UmphWygRNy2C3jJ239gV_DBnZ2syeg95Ki-374WHUP-i3yIhv5i-7KU2CEoPXwURQp6IVYMw-DjAOzn7C3JCu5wpngXmbZKtJdWmiBzHpcO2aICJPu1KvJrDLDP20chJBXzVYJtkfjviLNNW7l7Y3ydcHDsBRKZc3GuMQanmcghXPyoDg41g8XbwPudVh7uCmUponBQpIhbuffFP_tbV8SNzsPoFz9CLpBCZagJVXeqWoYMPe2dSsPiLO9Alf_YIe5zpi-zY4C3aLw5g9at35eZTfNd0gBRpR5ojkMIcZZ6IgAA"},
                     {"session_state", "7B29111D-C220-4263-99AB-6F6E135D75EF"},
                     {"state", "D79E5777-702E-4260-9A62-37F75FF22CCE" }
                 }, Stream.Null, null);
-                mockAuthService.SetupGet(s => s.Request).Returns(request);
+                var mockAuthService = MockAuthService(request);
                 using (new HttpResultsFilter
                 {
                     StringResultFn = (tokenRequest) =>
@@ -165,6 +161,38 @@ namespace ServiceStack.Authentication.Aad.Tests
                     // TODO: Redirect to original request
                 }
             }
+        }
+
+        [Test]
+        public void ShouldSetReferrerFromRedirectParam()
+        {
+            // TODO: Do I really need to create an apphost so that it won't die trying to get the base URL?
+            using (TestAppHost())
+            {
+                var request = new MockHttpRequest("myapp", "GET", "text", "/myapp", new NameValueCollection {
+                    {"redirect", "http://localhost/myapp/secure-resource"}
+                }, Stream.Null, null);
+                var mockAuthService = MockAuthService(request);
+                var session = new AuthUserSession();
+                
+                Subject.Authenticate(mockAuthService.Object, session, new Authenticate());
+
+                session.ReferrerUrl.Should().Be("http://localhost/myapp/secure-resource");
+            }
+        }
+
+        private static Mock<IServiceBase> MockAuthService(MockHttpRequest request = null)
+        {
+            request = request ?? new MockHttpRequest();
+            var mockAuthService = new Mock<IServiceBase>();
+            mockAuthService.SetupGet(s => s.Request).Returns(request);
+            return mockAuthService;
+        }
+
+        private IDisposable TestAppHost()
+        {
+            // TODO: Do I really need to create an apphost so that it won't die trying to get the base URL?
+            return new BasicAppHost(typeof(Service).Assembly).Init();
         }
 
         // TODO: If the state value in the response matches the state value in the request, the application should store the authorization code for use in the access token request.
