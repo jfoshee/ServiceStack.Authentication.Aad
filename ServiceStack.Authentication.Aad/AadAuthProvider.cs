@@ -121,6 +121,8 @@ namespace ServiceStack.Authentication.Aad
                 }
                 // TODO: Validate matching `state`
                 tokens.AccessTokenSecret = authInfo["access_token"];
+                tokens.RefreshToken = authInfo["refresh_token"];
+                tokens.RefreshTokenExpiry = authInfo["expires_on"].ToInt64().FromUnixTime();
                 session.IsAuthenticated = true;
                 // TODO: Redirect the user where they wanted to go in the first place (redirect param in initial auth request)
                 return OnAuthenticated(authService, session, tokens, authInfo.ToDictionary())
@@ -150,10 +152,16 @@ namespace ServiceStack.Authentication.Aad
                 // The id_token is a JWT token. See http://jwt.io
                 var jwt = new JwtSecurityToken(authInfo["id_token"]);
                 // TODO: Validate JWT is signed in expected way
+                // TODO: Validate aud is ClientID
+                // TODO: Validate tid is TenantID (if not common)
+                // TODO: Handle missing keys
                 var p = jwt.Payload;
-                tokens.UserId = (string)p["oid"];
+                tokens.UserId = (string) p["oid"];
                 tokens.UserName = (string) p["upn"];
-                tokens.DisplayName = (string) p["name"];
+                tokens.LastName = (string) p.GetValueOrDefault("family_name");
+                tokens.FirstName = (string) p.GetValueOrDefault("given_name");
+                tokens.DisplayName = (string) p.GetValueOrDefault("name") ?? tokens.FirstName + " " + tokens.LastName;
+
                 // TODO: Get Email address
                 //tokens.Email = (string) p["email"];
                 //tokens.Company = obj.Get("company");
