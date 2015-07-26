@@ -7,8 +7,6 @@ using System.IdentityModel.Tokens;
 using System.Net;
 using System.Text;
 
-// This is still a work in progress...
-
 namespace ServiceStack.Authentication.Aad
 {
     /// <summary>
@@ -83,7 +81,9 @@ namespace ServiceStack.Authentication.Aad
         {
             // TODO: WARN: Property 'code' does not exist on type 'ServiceStack.Authenticate'
             // TODO: WARN: Property 'session_state' does not exist on type 'ServiceStack.Authenticate'
-            // TODO: The Init function sets up the CallbackUrl if it is not present which would be ok *if* it stripped the paramlist
+            // TODO: The base Init() should strip the query string from the request URL
+            if (CallbackUrl.IsNullOrEmpty())
+                CallbackUrl = new Uri(authService.Request.AbsoluteUri).GetLeftPart(UriPartial.Path);
             var tokens = Init(authService, ref session, request);
             var httpRequest = authService.Request;
 
@@ -157,13 +157,8 @@ namespace ServiceStack.Authentication.Aad
                     Log.Error("access_token error callback. {0}".Fmt(authInfo.ToString()));
                     return authService.Redirect(FailedRedirectUrlFilter(this, session.ReferrerUrl.SetParam("f", "AccessTokenFailed")));
                 }
-                // TODO: Validate matching `state`
                 tokens.AccessTokenSecret = authInfo["access_token"];
                 tokens.RefreshToken = authInfo["refresh_token"];
-                var expiresOn = authInfo["expires_on"];
-                if (expiresOn != null)
-                    tokens.RefreshTokenExpiry = expiresOn.ToInt64().FromUnixTime();
-                //session.IsAuthenticated = true;
                 return OnAuthenticated(authService, session, tokens, authInfo.ToDictionary())
                        ?? authService.Redirect(SuccessRedirectUrlFilter(this, session.ReferrerUrl.SetParam("s", "1"))); //Haz Access!
             }
@@ -208,16 +203,9 @@ namespace ServiceStack.Authentication.Aad
                 tokens.LastName = (string) p.GetValueOrDefault("family_name");
                 tokens.FirstName = (string) p.GetValueOrDefault("given_name");
                 tokens.DisplayName = (string) p.GetValueOrDefault("name") ?? tokens.FirstName + " " + tokens.LastName;
-
-                // TODO: Get Email address
-                //tokens.Email = (string) p["email"];
-                //tokens.Company = obj.Get("company");
-                //tokens.Country = obj.Get("country");
-                // TODO: Save other payload info
-                //if (SaveExtendedUserInfo)
-                //{
-                //    obj.Each(x => authInfo[x.Key] = x.Value);
-                //}
+                tokens.RefreshTokenExpiry = jwt.ValidTo;
+                if (SaveExtendedUserInfo)
+                    p.Each(x => authInfo[x.Key] = x.Value.ToString());
             }
             catch (KeyNotFoundException ex)
             {

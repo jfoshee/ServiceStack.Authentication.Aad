@@ -95,7 +95,6 @@ namespace ServiceStack.Authentication.Aad.Tests
             {
                 Subject.ClientId = "2d4d11a2-f814-46a7-890a-274a72a7309e";
                 Subject.CallbackUrl = "http://localhost/myapp/";
-                // TODO: It is confusing that there is a CallbackUrl and a RedirectUrl
                 var mockAuthService = MockAuthService();
 
                 var response = Subject.Authenticate(mockAuthService.Object, new AuthUserSession(), new Authenticate());
@@ -103,6 +102,33 @@ namespace ServiceStack.Authentication.Aad.Tests
                 var result = (IHttpResult) response;
                 result.Headers["Location"].Should().StartWith(
                     "https://login.microsoftonline.com/common/oauth2/authorize?response_type=code&client_id=2d4d11a2-f814-46a7-890a-274a72a7309e&redirect_uri=http%3a%2f%2flocalhost%2fmyapp%2f");
+                var codeRequest = new Uri(result.Headers["Location"]);
+                var query = PclExportClient.Instance.ParseQueryString(codeRequest.Query);
+                query["response_type"].Should().Be("code");
+                query["client_id"].Should().Be(Subject.ClientId);
+                query["redirect_uri"].UrlDecode().Should().Be(Subject.CallbackUrl, "The redirect_uri must match what was configured in AAD *exactly* therefore the user can configure it directly.");
+            }
+        }
+
+        [Test]
+        public void ShouldSetCallbackUrlWithoutParameters()
+        {
+            using (TestAppHost())
+            {
+                Subject.ClientId = "c1";
+                var request = new MockHttpRequest("auth", "GET", "text", "/auth/foo/bar?redirect=" + "http://localhost/secure-resource".UrlEncode(), new NameValueCollection {
+                    // For some reason the following does not repro the problem: {"redirect", "http://localhost/secure-resource"},
+                }, Stream.Null, null);
+                var mockAuthService = MockAuthService(request);
+
+                var response = Subject.Authenticate(mockAuthService.Object, new AuthUserSession(), new Authenticate());
+
+                var result = (IHttpResult)response;
+                var codeRequest = new Uri(result.Headers["Location"]);
+                var query = PclExportClient.Instance.ParseQueryString(codeRequest.Query);
+                query["response_type"].Should().Be("code");
+                Subject.CallbackUrl.Should().Be("http://localhost/auth/foo/bar");
+                query["redirect_uri"].UrlDecode().Should().Be(Subject.CallbackUrl, "The redirect_uri must match what was configured in AAD *exactly* therefore is intolerant of parameters.");
             }
         }
 
@@ -124,7 +150,7 @@ namespace ServiceStack.Authentication.Aad.Tests
                 var mockAuthService = MockAuthService(request);
                 using (new HttpResultsFilter
                 {
-                    StringResultFn = (tokenRequest) =>
+                    StringResultFn = tokenRequest =>
                     {
                         // To redeem an authorization code and get an access token,
                         // send an HTTP POST request to a common or tenant-specific Azure AD Authorization endpoint.
@@ -271,9 +297,9 @@ namespace ServiceStack.Authentication.Aad.Tests
                 var mockAuthService = MockAuthService(request);
                 using (new HttpResultsFilter
                 {
-                    StringResultFn = (tokenRequest) =>
+                    StringResultFn = tokenRequest =>
                     {
-                        //Assert.Fail("Should never have made toke request since the state was not matched");
+                        Assert.Fail("Should never have made token request since the state was not matched");
                         return @"{
                           ""access_token"": ""fake token"",
                           ""id_token"": ""eyJ0eXAiOiJKV1QiLCJhbGciOiJub25lIn0.eyJhdWQiOiIyZDRkMTFhMi1mODE0LTQ2YTctODkwYS0yNzRhNzJhNzMwOWUiLCJpc3MiOiJodHRwczovL3N0cy53aW5kb3dzLm5ldC83ZmU4MTQ0Ny1kYTU3LTQzODUtYmVjYi02ZGU1N2YyMTQ3N2UvIiwiaWF0IjoxMzg4NDQwODYzLCJuYmYiOjEzODg0NDA4NjMsImV4cCI6MTM4ODQ0NDc2MywidmVyIjoiMS4wIiwidGlkIjoiN2ZlODE0NDctZGE1Ny00Mzg1LWJlY2ItNmRlNTdmMjE0NzdlIiwib2lkIjoiNjgzODlhZTItNjJmYS00YjE4LTkxZmUtNTNkZDEwOWQ3NGY1IiwidXBuIjoiZnJhbmttQGNvbnRvc28uY29tIiwidW5pcXVlX25hbWUiOiJmcmFua21AY29udG9zby5jb20iLCJzdWIiOiJKV3ZZZENXUGhobHBTMVpzZjd5WVV4U2hVd3RVbTV5elBtd18talgzZkhZIiwiZmFtaWx5X25hbWUiOiJNaWxsZXIiLCJnaXZlbl9uYW1lIjoiRnJhbmsifQ.""
@@ -295,6 +321,40 @@ namespace ServiceStack.Authentication.Aad.Tests
             }
         }
 
+        [Test]
+        public void ShouldSaveExtendedInfoFromPayload()
+        {
+            using (TestAppHost())
+            {
+                Subject.SaveExtendedUserInfo = true;
+                Subject.ClientId = "2d4d11a2-f814-46a7-890a-274a72a7309e";
+                var request = new MockHttpRequest("myapp", "GET", "text", "/myapp", new NameValueCollection {
+                    {"code", "c1"},
+                    {"state", "s1" }
+                }, Stream.Null, null);
+                var mockAuthService = MockAuthService(request);
+                using (new HttpResultsFilter
+                {
+                    StringResult = @"{
+                          ""access_token"": ""t1"",
+                          ""token_type"": ""Bearer"",
+                          ""id_token"": ""eyJ0eXAiOiJKV1QiLCJhbGciOiJub25lIn0.eyJhdWQiOiIyZDRkMTFhMi1mODE0LTQ2YTctODkwYS0yNzRhNzJhNzMwOWUiLCJpc3MiOiJodHRwczovL3N0cy53aW5kb3dzLm5ldC83ZmU4MTQ0Ny1kYTU3LTQzODUtYmVjYi02ZGU1N2YyMTQ3N2UvIiwiaWF0IjoxMzg4NDQwODYzLCJuYmYiOjEzODg0NDA4NjMsImV4cCI6MTM4ODQ0NDc2MywidmVyIjoiMS4wIiwidGlkIjoiN2ZlODE0NDctZGE1Ny00Mzg1LWJlY2ItNmRlNTdmMjE0NzdlIiwib2lkIjoiNjgzODlhZTItNjJmYS00YjE4LTkxZmUtNTNkZDEwOWQ3NGY1IiwidXBuIjoiZnJhbmttQGNvbnRvc28uY29tIiwidW5pcXVlX25hbWUiOiJmcmFua21AY29udG9zby5jb20iLCJzdWIiOiJKV3ZZZENXUGhobHBTMVpzZjd5WVV4U2hVd3RVbTV5elBtd18talgzZkhZIiwiZmFtaWx5X25hbWUiOiJNaWxsZXIiLCJnaXZlbl9uYW1lIjoiRnJhbmsifQ.""
+                        }"
+                })
+                {
+                    var session = new AuthUserSession { State = "s1" };
+
+                    Subject.Authenticate(mockAuthService.Object, session, new Authenticate());
+
+                    var tokens = session.GetOAuthTokens("aad");
+                    var items = tokens.Items;
+                    items["token_type"].Should().Be("Bearer");
+                    items["iss"].Should().Be("https://sts.windows.net/7fe81447-da57-4385-becb-6de57f21477e/");
+                    items["sub"].Should().Be("JWvYdCWPhhlpS1Zsf7yYUxShUwtUm5yzPmw_-jX3fHY");
+                }
+            }
+        }
+
         private static Mock<IServiceBase> MockAuthService(MockHttpRequest request = null)
         {
             request = request ?? new MockHttpRequest();
@@ -303,16 +363,20 @@ namespace ServiceStack.Authentication.Aad.Tests
             return mockAuthService;
         }
 
-        private IDisposable TestAppHost()
+        private static IDisposable TestAppHost()
         {
             // TODO: Do I really need to create an apphost so that it won't die trying to get the base URL?
             return new BasicAppHost(typeof(Service).Assembly).Init();
         }
 
-        // TODO: Use the refresh token to request a new access token
+        // TODO: Support configurable domain_hint in code request
         // TODO: Consumer can provide a different resource id
-        // TODO: Can we validate the token comes from microsoft?  At least record the "iss" value of the jwt
+        // TODO: Can we validate the token comes from microsoft?
         // TODO: Should we request & verify a particular JWT signing algorithm?  https://auth0.com/blog/2015/03/31/critical-vulnerabilities-in-json-web-token-libraries/
-
+        // TODO: Use the refresh token to request a new access token
+        // TODO: Get Email address
+        // TODO: It is confusing that there is a CallbackUrl and a RedirectUrl
+        // TODO: Should not permit renewing token with different user
+        // TODO: Can provide login_hint in code request if renewing or we have user's email
     }
 }
