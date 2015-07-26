@@ -115,7 +115,6 @@ namespace ServiceStack.Authentication.Aad.Tests
             using (TestAppHost())
             {
                 Subject.ClientId = "2d4d11a2-f814-46a7-890a-274a72a7309e";
-                // TODO: Subject.TenantId
                 Subject.CallbackUrl = "http://localhost/myapp/";
                 var request = new MockHttpRequest("myapp", "GET", "text", "/myapp", new NameValueCollection {
                     {"code", "AwABAAAAvPM1KaPlrEqdFSBzjqfTGBCmLdgfSTLEMPGYuNHSUYBrqqf_ZT_p5uEAEJJ_nZ3UmphWygRNy2C3jJ239gV_DBnZ2syeg95Ki-374WHUP-i3yIhv5i-7KU2CEoPXwURQp6IVYMw-DjAOzn7C3JCu5wpngXmbZKtJdWmiBzHpcO2aICJPu1KvJrDLDP20chJBXzVYJtkfjviLNNW7l7Y3ydcHDsBRKZc3GuMQanmcghXPyoDg41g8XbwPudVh7uCmUponBQpIhbuffFP_tbV8SNzsPoFz9CLpBCZagJVXeqWoYMPe2dSsPiLO9Alf_YIe5zpi-zY4C3aLw5g9at35eZTfNd0gBRpR5ojkMIcZZ6IgAA"},
@@ -150,7 +149,7 @@ namespace ServiceStack.Authentication.Aad.Tests
                     }
                 })
                 {
-                    var session = new AuthUserSession();
+                    var session = new AuthUserSession {State = "D79E5777-702E-4260-9A62-37F75FF22CCE"};
 
                     var response = Subject.Authenticate(mockAuthService.Object, session, new Authenticate());
 
@@ -179,7 +178,6 @@ namespace ServiceStack.Authentication.Aad.Tests
         [Test]
         public void ShouldSetReferrerFromRedirectParam()
         {
-            // TODO: Do I really need to create an apphost so that it won't die trying to get the base URL?
             using (TestAppHost())
             {
                 var request = new MockHttpRequest("myapp", "GET", "text", "/myapp", new NameValueCollection {
@@ -230,14 +228,69 @@ namespace ServiceStack.Authentication.Aad.Tests
                 })
                 {
                     var session = new AuthUserSession();
-                    try
-                    {
-                        Subject.Authenticate(mockAuthService.Object, session, new Authenticate());
-                    }
-                    catch (UnauthorizedAccessException)
-                    {
-                    }
+
+                    try{ Subject.Authenticate(mockAuthService.Object, session, new Authenticate()); }
+                    catch (UnauthorizedAccessException){}
+
                     session.IsAuthenticated.Should().BeFalse();
+                }
+            }
+        }
+
+        [Test]
+        public void ShouldSaveOAuth2StateValue()
+        {
+            using (TestAppHost())
+            {
+                var session = new AuthUserSession();
+
+                var response = Subject.Authenticate(MockAuthService().Object, session, new Authenticate());
+
+                var result = (IHttpResult)response;
+                var codeRequest = new Uri(result.Headers["Location"]);
+                var query = PclExportClient.Instance.ParseQueryString(codeRequest.Query);
+                var state = query["state"];
+                session.State.Should().Be(state);
+            }            
+        }
+
+        [Test]
+        public void ShouldAbortIfStateValuesDoNotMatch()
+        {
+            // If the state value in the response matches the state value in the request, 
+            // the application should store the authorization code for use in the access token request.
+            using (TestAppHost())
+            {
+                Subject.ClientId = "2d4d11a2-f814-46a7-890a-274a72a7309e";
+                Subject.CallbackUrl = "http://localhost/myapp/";
+                var request = new MockHttpRequest("myapp", "GET", "text", "/myapp", new NameValueCollection {
+                    {"code", "code123"},
+                    {"session_state", "dontcare"},
+                    {"state", "state123" }
+                }, Stream.Null, null);
+                var mockAuthService = MockAuthService(request);
+                using (new HttpResultsFilter
+                {
+                    StringResultFn = (tokenRequest) =>
+                    {
+                        //Assert.Fail("Should never have made toke request since the state was not matched");
+                        return @"{
+                          ""access_token"": ""fake token"",
+                          ""id_token"": ""eyJ0eXAiOiJKV1QiLCJhbGciOiJub25lIn0.eyJhdWQiOiIyZDRkMTFhMi1mODE0LTQ2YTctODkwYS0yNzRhNzJhNzMwOWUiLCJpc3MiOiJodHRwczovL3N0cy53aW5kb3dzLm5ldC83ZmU4MTQ0Ny1kYTU3LTQzODUtYmVjYi02ZGU1N2YyMTQ3N2UvIiwiaWF0IjoxMzg4NDQwODYzLCJuYmYiOjEzODg0NDA4NjMsImV4cCI6MTM4ODQ0NDc2MywidmVyIjoiMS4wIiwidGlkIjoiN2ZlODE0NDctZGE1Ny00Mzg1LWJlY2ItNmRlNTdmMjE0NzdlIiwib2lkIjoiNjgzODlhZTItNjJmYS00YjE4LTkxZmUtNTNkZDEwOWQ3NGY1IiwidXBuIjoiZnJhbmttQGNvbnRvc28uY29tIiwidW5pcXVlX25hbWUiOiJmcmFua21AY29udG9zby5jb20iLCJzdWIiOiJKV3ZZZENXUGhobHBTMVpzZjd5WVV4U2hVd3RVbTV5elBtd18talgzZkhZIiwiZmFtaWx5X25hbWUiOiJNaWxsZXIiLCJnaXZlbl9uYW1lIjoiRnJhbmsifQ.""
+                        }";
+
+                    }
+                })
+                {
+                    var session = new AuthUserSession
+                    {
+                        State = "state133" // Not the same as the state in the request above
+                    };
+
+                    try { Subject.Authenticate(mockAuthService.Object, session, new Authenticate()); }
+                    catch (UnauthorizedAccessException){}
+
+                    session.IsAuthenticated.Should().BeFalse("Should not be authenticated");
                 }
             }
         }
@@ -256,8 +309,10 @@ namespace ServiceStack.Authentication.Aad.Tests
             return new BasicAppHost(typeof(Service).Assembly).Init();
         }
 
-        // TODO: If the state value in the response matches the state value in the request, the application should store the authorization code for use in the access token request.
         // TODO: Use the refresh token to request a new access token
         // TODO: Consumer can provide a different resource id
+        // TODO: Can we validate the token comes from microsoft?  At least record the "iss" value of the jwt
+        // TODO: Should we request & verify a particular JWT signing algorithm?  https://auth0.com/blog/2015/03/31/critical-vulnerabilities-in-json-web-token-libraries/
+
     }
 }

@@ -103,15 +103,29 @@ namespace ServiceStack.Authentication.Aad
                 return authService.Redirect(FailedRedirectUrlFilter(this, session.ReferrerUrl.SetParam("f", error)));
             }
 
+            // TODO: Can State property be added to IAuthSession
+            AuthUserSession userSession = session as AuthUserSession;
+            if (userSession == null)
+                throw new NotSupportedException("Concrete dependence on AuthUserSession because of State property");
+
             // STEP 1: Request Code
             var code = httpRequest.QueryString["code"];
             var isPreAuthCallback = !code.IsNullOrEmpty();
             if (!isPreAuthCallback)
             {
+                var state = Guid.NewGuid().ToString("N");
+                userSession.State = state;
                 string preAuthUrl = AuthorizeUrl + "?response_type=code&client_id={0}&redirect_uri={1}&scope={2}&state={3}"
-                    .Fmt(ClientId, CallbackUrl.UrlEncode(), Scopes.Join(","), Guid.NewGuid().ToString("N"));
+                    .Fmt(ClientId, CallbackUrl.UrlEncode(), Scopes.Join(","), state);
                 authService.SaveSession(session, SessionExpiry);
                 return authService.Redirect(PreAuthUrlFilter(this, preAuthUrl));
+            }
+
+            var returnedState = httpRequest.QueryString["state"];
+            if (returnedState != userSession.State)
+            {
+                session.IsAuthenticated = false;
+                throw new UnauthorizedAccessException("Mismatched state in code response.");
             }
 
             // 2. The Azure AD authorization endpoint redirects the user agent back 
@@ -176,7 +190,6 @@ namespace ServiceStack.Authentication.Aad
                 // The id_token is a JWT token. See http://jwt.io
                 var jwt = new JwtSecurityToken(authInfo["id_token"]);
                 // TODO: Validate JWT is signed in expected way
-                // TODO: Validate aud is ClientID
                 
                 var p = jwt.Payload;
                 var tenantId = (string) p["tid"];
