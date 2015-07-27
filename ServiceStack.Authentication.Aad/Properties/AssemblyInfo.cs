@@ -6,9 +6,9 @@ using System.Runtime.InteropServices;
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
 [assembly: AssemblyTitle("ServiceStack.Authentication.Aad")]
-[assembly: AssemblyDescription("")]
+[assembly: AssemblyDescription("Azure Active Directory AuthProvider plugin for ServiceStack")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("")]
+[assembly: AssemblyCompany("Jacob Foshee - Durwella")]
 [assembly: AssemblyProduct("ServiceStack.Authentication.Aad")]
 [assembly: AssemblyCopyright("Copyright ©  2015")]
 [assembly: AssemblyTrademark("")]
