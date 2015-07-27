@@ -37,6 +37,8 @@ namespace ServiceStack.Authentication.Aad.Tests
                 { "oauth.aad.TenantId", "tenant789" },
                 { "oauth.aad.ClientId", "client1234" },
                 { "oauth.aad.ClientSecret", "secret456" },
+                { "oauth.aad.CallbackUrl", "http://example.com/auth" },
+                { "oauth.aad.DomainHint", "servicestack.net" },
             };
             var appSettings = new DictionarySettings(settings);
 
@@ -49,6 +51,8 @@ namespace ServiceStack.Authentication.Aad.Tests
             Subject.ConsumerSecret.Should().Be(Subject.ClientSecret);
             Subject.AuthorizeUrl.Should().Be("https://login.microsoftonline.com/tenant789/oauth2/authorize");
             Subject.AccessTokenUrl.Should().Be("https://login.microsoftonline.com/tenant789/oauth2/token");
+            Subject.CallbackUrl.Should().Be("http://example.com/auth");
+            Subject.DomainHint.Should().Be("servicestack.net");
         }
 
         [Test]
@@ -95,6 +99,7 @@ namespace ServiceStack.Authentication.Aad.Tests
             {
                 Subject.ClientId = "2d4d11a2-f814-46a7-890a-274a72a7309e";
                 Subject.CallbackUrl = "http://localhost/myapp/";
+                Subject.DomainHint = null;
                 var mockAuthService = MockAuthService();
 
                 var response = Subject.Authenticate(mockAuthService.Object, new AuthUserSession(), new Authenticate());
@@ -107,6 +112,7 @@ namespace ServiceStack.Authentication.Aad.Tests
                 query["response_type"].Should().Be("code");
                 query["client_id"].Should().Be(Subject.ClientId);
                 query["redirect_uri"].UrlDecode().Should().Be(Subject.CallbackUrl, "The redirect_uri must match what was configured in AAD *exactly* therefore the user can configure it directly.");
+                query["domain_hint"].Should().BeNull();
             }
         }
 
@@ -129,6 +135,23 @@ namespace ServiceStack.Authentication.Aad.Tests
                 query["response_type"].Should().Be("code");
                 Subject.CallbackUrl.Should().Be("http://localhost/auth/foo/bar");
                 query["redirect_uri"].UrlDecode().Should().Be(Subject.CallbackUrl, "The redirect_uri must match what was configured in AAD *exactly* therefore is intolerant of parameters.");
+            }
+        }
+
+        [Test]
+        public void ShouldUseDomainHintWhenProvided()
+        {
+            using (TestAppHost())
+            {
+                Subject.ClientId = "c1";
+                Subject.DomainHint = "domain.hint";
+
+                var response = Subject.Authenticate(MockAuthService().Object, new AuthUserSession(), new Authenticate());
+
+                var result = (IHttpResult)response;
+                var codeRequest = new Uri(result.Headers["Location"]);
+                var query = PclExportClient.Instance.ParseQueryString(codeRequest.Query);
+                query["domain_hint"].Should().Be(Subject.DomainHint);
             }
         }
 

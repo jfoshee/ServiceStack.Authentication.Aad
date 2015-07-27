@@ -54,6 +54,8 @@ namespace ServiceStack.Authentication.Aad
             set { ConsumerSecret = value; }
         }
 
+        public string DomainHint { get; set; }
+
         public string[] Scopes { get; set; }
 
 
@@ -67,6 +69,7 @@ namespace ServiceStack.Authentication.Aad
         {
             AppSettings = appSettings;
             TenantId = AppSettings.Get<string>("oauth.{0}.TenantId".Fmt(Provider), null);
+            DomainHint = AppSettings.Get<string>("oauth.{0}.DomainHint".Fmt(Provider), null);
             Scopes = AppSettings.Get("oauth.{0}.Scopes", new[] { "user_impersonation" });
         }
 
@@ -115,10 +118,12 @@ namespace ServiceStack.Authentication.Aad
             {
                 var state = Guid.NewGuid().ToString("N");
                 userSession.State = state;
-                string preAuthUrl = AuthorizeUrl + "?response_type=code&client_id={0}&redirect_uri={1}&scope={2}&state={3}"
+                var codeRequest = AuthorizeUrl + "?response_type=code&client_id={0}&redirect_uri={1}&scope={2}&state={3}"
                     .Fmt(ClientId, CallbackUrl.UrlEncode(), Scopes.Join(","), state);
+                if (!DomainHint.IsNullOrEmpty())
+                    codeRequest += "&domain_hint=" + DomainHint;
                 authService.SaveSession(session, SessionExpiry);
-                return authService.Redirect(PreAuthUrlFilter(this, preAuthUrl));
+                return authService.Redirect(PreAuthUrlFilter(this, codeRequest));
             }
 
             var returnedState = httpRequest.QueryString["state"];
