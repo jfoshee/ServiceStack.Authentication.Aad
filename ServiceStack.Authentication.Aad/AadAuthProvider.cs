@@ -11,6 +11,11 @@ namespace ServiceStack.Authentication.Aad
 {
     /// <summary>
     /// Azure Active Directory Auth Provider
+    /// You must provide the ClientId and ClientSecret.
+    /// They can be provided to the constructor, by setting the properties,
+    /// or in the app.config appsettings under the following keys: 
+    /// `oauth.aad.ClientId` and `oauth.aad.ClientSecret`
+    /// You may also provide the TenantId of your AAD resource.
     /// See: https://msdn.microsoft.com/en-us/library/azure/dn645542.aspx
     /// </summary>
     public class AadAuthProvider : OAuthProvider
@@ -62,6 +67,20 @@ namespace ServiceStack.Authentication.Aad
         public AadAuthProvider()
             : this(new AppSettings())
         {
+        }
+
+        public AadAuthProvider(string clientId, string clientSecret)
+            : this()
+        {
+            ClientId = clientId;
+            ClientSecret = clientSecret;
+        }
+
+        public AadAuthProvider(string clientId, string clientSecret, IAppSettings appSettings)
+            : this(appSettings)
+        {
+            ClientId = clientId;
+            ClientSecret = clientSecret;
         }
 
         public AadAuthProvider(IAppSettings appSettings)

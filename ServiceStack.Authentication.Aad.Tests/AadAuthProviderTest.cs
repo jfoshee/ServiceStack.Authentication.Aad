@@ -56,6 +56,19 @@ namespace ServiceStack.Authentication.Aad.Tests
         }
 
         [Test]
+        public void ShouldSetMinimumParameters()
+        {
+            var clientId = "cl1";
+            var clientSecret = "cs2";
+
+            Subject = new AadAuthProvider(clientId, clientSecret);
+
+            Subject.ClientId.Should().Be(clientId);
+            Subject.ClientSecret.Should().Be(clientSecret);
+            ShouldUseCommonEndpointWhenTenantIdMissing();
+        }
+
+        [Test]
         public void ShouldUseGivenUrls()
         {
             var settings = new Dictionary<string, string>
