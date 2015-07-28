@@ -220,13 +220,14 @@ namespace ServiceStack.Authentication.Aad
                 if (!p.Aud.Contains(ClientId))
                 {
                     userSession.IsAuthenticated = false;
-                    throw new UnauthorizedAccessException("Mismatched Client ID in JWT token");                    
+                    throw new UnauthorizedAccessException("Mismatched Client ID in JWT token");
                 }
                 tokens.UserId = (string) p["oid"];
                 tokens.UserName = (string) p["upn"];
                 tokens.LastName = (string) p.GetValueOrDefault("family_name");
                 tokens.FirstName = (string) p.GetValueOrDefault("given_name");
                 tokens.DisplayName = (string) p.GetValueOrDefault("name") ?? tokens.FirstName + " " + tokens.LastName;
+                tokens.Email = (string) p.GetValueOrDefault("email");
                 tokens.RefreshTokenExpiry = jwt.ValidTo;
                 if (SaveExtendedUserInfo)
                     p.Each(x => authInfo[x.Key] = x.Value.ToString());
