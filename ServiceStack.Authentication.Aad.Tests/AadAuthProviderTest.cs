@@ -39,6 +39,7 @@ namespace ServiceStack.Authentication.Aad.Tests
                 { "oauth.aad.ClientSecret", "secret456" },
                 { "oauth.aad.CallbackUrl", "http://example.com/auth" },
                 { "oauth.aad.DomainHint", "servicestack.net" },
+                { "oauth.aad.ResourceId", "r2d2" },
             };
             var appSettings = new DictionarySettings(settings);
 
@@ -53,6 +54,7 @@ namespace ServiceStack.Authentication.Aad.Tests
             Subject.AccessTokenUrl.Should().Be("https://login.microsoftonline.com/tenant789/oauth2/token");
             Subject.CallbackUrl.Should().Be("http://example.com/auth");
             Subject.DomainHint.Should().Be("servicestack.net");
+            Subject.ResourceId.Should().Be("r2d2");
         }
 
         [Test]
@@ -101,6 +103,14 @@ namespace ServiceStack.Authentication.Aad.Tests
             ShouldUseCommonEndpointWhenTenantIdMissing();
             Subject.TenantId = null;
             ShouldUseCommonEndpointWhenTenantIdMissing();
+        }
+
+        [Test]
+        public void ShouldDefaultToAzureActiveDirectoryResourceId()
+        {
+            // By default the resource we are requesting access to is AAD itself
+            // See http://stackoverflow.com/a/31245525/483776
+            Subject.ResourceId.Should().Be("00000002-0000-0000-c000-000000000000");
         }
 
         // Tests based on examples at https://msdn.microsoft.com/en-us/library/azure/dn645542.aspx
@@ -196,7 +206,9 @@ namespace ServiceStack.Authentication.Aad.Tests
                         tokenRequest.ContentType.Should().Be("application/x-www-form-urlencoded");
                         // TODO: Test form data. Seems impossible: http://stackoverflow.com/questions/31630526/can-i-test-form-data-using-httpresultsfilter-callback
                         //formData["client_id"].Should().Be(Subject.ClientId);
-                        //formData["redirect_uri"]
+                        //formData["client_secret"].Should().Be(Subject.ClientSecret);
+                        //formData["redirect_uri"].Should().Be(Subject.CallbackUrl);
+                        //formData["resource"].Should().Be(Subject.ResourceId);
                         return 
                         @"{
                           ""access_token"": ""eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsIng1dCI6Ik5HVEZ2ZEstZnl0aEV1THdqcHdBSk9NOW4tQSJ9.eyJhdWQiOiJodHRwczovL3NlcnZpY2UuY29udG9zby5jb20vIiwiaXNzIjoiaHR0cHM6Ly9zdHMud2luZG93cy5uZXQvN2ZlODE0NDctZGE1Ny00Mzg1LWJlY2ItNmRlNTdmMjE0NzdlLyIsImlhdCI6MTM4ODQ0MDg2MywibmJmIjoxMzg4NDQwODYzLCJleHAiOjEzODg0NDQ3NjMsInZlciI6IjEuMCIsInRpZCI6IjdmZTgxNDQ3LWRhNTctNDM4NS1iZWNiLTZkZTU3ZjIxNDc3ZSIsIm9pZCI6IjY4Mzg5YWUyLTYyZmEtNGIxOC05MWZlLTUzZGQxMDlkNzRmNSIsInVwbiI6ImZyYW5rbUBjb250b3NvLmNvbSIsInVuaXF1ZV9uYW1lIjoiZnJhbmttQGNvbnRvc28uY29tIiwic3ViIjoiZGVOcUlqOUlPRTlQV0pXYkhzZnRYdDJFYWJQVmwwQ2o4UUFtZWZSTFY5OCIsImZhbWlseV9uYW1lIjoiTWlsbGVyIiwiZ2l2ZW5fbmFtZSI6IkZyYW5rIiwiYXBwaWQiOiIyZDRkMTFhMi1mODE0LTQ2YTctODkwYS0yNzRhNzJhNzMwOWUiLCJhcHBpZGFjciI6IjAiLCJzY3AiOiJ1c2VyX2ltcGVyc29uYXRpb24iLCJhY3IiOiIxIn0.JZw8jC0gptZxVC-7l5sFkdnJgP3_tRjeQEPgUn28XctVe3QqmheLZw7QVZDPCyGycDWBaqy7FLpSekET_BftDkewRhyHk9FW_KeEz0ch2c3i08NGNDbr6XYGVayNuSesYk5Aw_p3ICRlUV1bqEwk-Jkzs9EEkQg4hbefqJS6yS1HoV_2EsEhpd_wCQpxK89WPs3hLYZETRJtG5kvCCEOvSHXmDE6eTHGTnEgsIk--UlPe275Dvou4gEAwLofhLDQbMSjnlV5VLsjimNBVcSRFShoxmQwBJR_b2011Y5IuD6St5zPnzruBbZYkGNurQK63TJPWmRd3mbJsGM0mf3CUQ"",

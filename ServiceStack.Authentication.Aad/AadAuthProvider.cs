@@ -10,7 +10,7 @@ using System.Text;
 namespace ServiceStack.Authentication.Aad
 {
     /// <summary>
-    /// Azure Active Directory Auth Provider
+    /// Azure Active Directory (AAD) Auth Provider
     /// You must provide the ClientId and ClientSecret.
     /// They can be provided to the constructor, by setting the properties,
     /// or in the app.config appsettings under the following keys: 
@@ -59,6 +59,8 @@ namespace ServiceStack.Authentication.Aad
             set { ConsumerSecret = value; }
         }
 
+        public string ResourceId { get; set; }
+
         public string DomainHint { get; set; }
 
         public string[] Scopes { get; set; }
@@ -89,6 +91,7 @@ namespace ServiceStack.Authentication.Aad
             AppSettings = appSettings;
             TenantId = AppSettings.Get<string>("oauth.{0}.TenantId".Fmt(Provider), null);
             DomainHint = AppSettings.Get<string>("oauth.{0}.DomainHint".Fmt(Provider), null);
+            ResourceId = AppSettings.Get("oauth.{0}.ResourceId".Fmt(Provider), "00000002-0000-0000-c000-000000000000");
             Scopes = AppSettings.Get("oauth.{0}.Scopes", new[] { "user_impersonation" });
         }
 
@@ -159,11 +162,11 @@ namespace ServiceStack.Authentication.Aad
             //    Azure AD token issuance endpoint. It presents the authorization code 
             //    to prove that the user has consented.
 
-            // STEP 2: Request Token
-            var formData = "client_id={0}&redirect_uri={1}&client_secret={2}&code={3}&grant_type=authorization_code&resource=00000002-0000-0000-c000-000000000000"
-                .Fmt(ClientId, CallbackUrl.UrlEncode(), ClientSecret.UrlEncode(), code);
             try
             {
+                // STEP 2: Request Token
+                var formData = "client_id={0}&redirect_uri={1}&client_secret={2}&code={3}&grant_type=authorization_code&resource={4}"
+                    .Fmt(ClientId.UrlEncode(), CallbackUrl.UrlEncode(), ClientSecret.UrlEncode(), code, ResourceId.UrlEncode());
                 // Endpoint only accepts posts requests
                 var contents = AccessTokenUrl.PostToUrl(formData);
 
