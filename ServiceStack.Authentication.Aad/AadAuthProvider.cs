@@ -4,6 +4,7 @@ using ServiceStack.Text;
 using ServiceStack.Web;
 using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.IdentityModel.Tokens;
 using System.Net;
 using System.Text;
@@ -136,21 +137,12 @@ namespace ServiceStack.Authentication.Aad
             // 1. The client application starts the flow by redirecting the user agent 
             //    to the Azure AD authorization endpoint. The user authenticates and 
             //    consents, if consent is required.
-
-            //https://developer.github.com/v3/oauth/#common-errors-for-the-authorization-request
-            var error = httpRequest.QueryString["error"]
-                        ?? httpRequest.QueryString["error_uri"]
-                        ?? httpRequest.QueryString["error_description"];
-
-            var hasError = !error.IsNullOrEmpty();
-            if (hasError)
-            {
-                Log.Error("AAD error callback. {0}".Fmt(httpRequest.QueryString["error_description"].UrlDecode()));
-                return RedirectDueToFailure(authService, session, error);
-            }
+            var query = httpRequest.QueryString.ToNameValueCollection();
+            if (HasError(query))
+                return RedirectDueToFailure(authService, session, query);
 
             // TODO: Can State property be added to IAuthSession
-            AuthUserSession userSession = session as AuthUserSession;
+            var userSession = session as AuthUserSession;
             if (userSession == null)
                 throw new NotSupportedException("Concrete dependence on AuthUserSession because of State property");
 
@@ -197,14 +189,9 @@ namespace ServiceStack.Authentication.Aad
 
                 // Response is JSON
                 var authInfo = JsonObject.Parse(contents);
-                var accessTokenError = authInfo["error"]
-                                       ?? authInfo["error_uri"]
-                                       ?? authInfo["error_description"];
-                if (!accessTokenError.IsNullOrEmpty())
-                {
-                    Log.Error("access_token error callback. {0}".Fmt(authInfo.ToString()));
-                    return RedirectDueToFailure(authService, session, "AccessTokenFailed");
-                }
+                var authInfoNvc = authInfo.ToNameValueCollection();
+                if (HasError(authInfoNvc))
+                    return RedirectDueToFailure(authService, session, authInfoNvc);
                 tokens.AccessTokenSecret = authInfo["access_token"];
                 tokens.RefreshToken = authInfo["refresh_token"];
                 return OnAuthenticated(authService, session, tokens, authInfo.ToDictionary())
@@ -216,14 +203,10 @@ namespace ServiceStack.Authentication.Aad
                 var response = ((HttpWebResponse) webException.Response);
                 var responseText = Encoding.UTF8.GetString(
                     response.GetResponseStream().ReadFully());
-                Log.Error(responseText);
-                // TODO: Error response is JSON. Can get error code and description
-                if (webException.IsBadRequest())
-                {
-                    return RedirectDueToFailure(authService, session, "AccessTokenFailed");
-                }
+                var errorInfo = JsonObject.Parse(responseText).ToNameValueCollection();
+                return RedirectDueToFailure(authService, session, errorInfo);
             }
-            return RedirectDueToFailure(authService, session, "Unknown");
+            //return RedirectDueToFailure(authService, session, new NameValueCollection());
         }
 
         protected override void LoadUserAuthInfo(AuthUserSession userSession, IAuthTokens tokens, Dictionary<string, string> authInfo)
@@ -277,12 +260,26 @@ namespace ServiceStack.Authentication.Aad
             userSession.Email = tokens.Email ?? userSession.PrimaryEmail ?? userSession.Email;
         }
 
-        protected IHttpResult RedirectDueToFailure(IServiceBase authService, IAuthSession session, string fparam)
+        private bool HasError(NameValueCollection info)
         {
+            return !(info["error"] ?? info["error_uri"] ?? info["error_description"]).IsNullOrEmpty();
+        }
+
+        protected IHttpResult RedirectDueToFailure(IServiceBase authService, IAuthSession session, NameValueCollection errorInfo)
+        {
+            if (HasError(errorInfo))
+                Log.Error("{0} OAuth2 Error: '{1}' : \"{2}\" <{3}>".Fmt(
+                    Provider,
+                    errorInfo["error"],
+                    errorInfo["error_description"].UrlDecode(),
+                    errorInfo["error_uri"].UrlDecode()));
+            else
+                Log.Error("Unknown {0} OAuth2 Error".Fmt("Provider"));
             var baseUrl = authService.Request.GetBaseUrl();
             var destination = !FailureRedirectPath.IsNullOrEmpty() ? 
                 baseUrl + FailureRedirectPath :
                 session.ReferrerUrl ?? baseUrl;
+            var fparam = errorInfo["error"] ?? "Unknown";
             return authService.Redirect(FailedRedirectUrlFilter(this, destination.SetParam("f", fparam)));
         }
     }

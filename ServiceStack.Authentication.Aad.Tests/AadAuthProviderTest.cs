@@ -445,7 +445,6 @@ namespace ServiceStack.Authentication.Aad.Tests
             return new BasicAppHost(typeof(Service).Assembly).Init();
         }
 
-        // TODO: Consumer can provide a different resource id
         // TODO: Can we validate the token comes from microsoft?
         // TODO: Should we request & verify a particular JWT signing algorithm?  https://auth0.com/blog/2015/03/31/critical-vulnerabilities-in-json-web-token-libraries/
         // TODO: Use the refresh token to request a new access token
