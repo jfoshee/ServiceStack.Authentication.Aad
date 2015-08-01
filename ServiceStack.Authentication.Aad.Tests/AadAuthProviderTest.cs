@@ -40,6 +40,7 @@ namespace ServiceStack.Authentication.Aad.Tests
                 { "oauth.aad.CallbackUrl", "http://example.com/auth" },
                 { "oauth.aad.DomainHint", "servicestack.net" },
                 { "oauth.aad.ResourceId", "r2d2" },
+                { "oauth.aad.FailureRedirectPath", "/bad/news" },
             };
             var appSettings = new DictionarySettings(settings);
 
@@ -55,6 +56,7 @@ namespace ServiceStack.Authentication.Aad.Tests
             Subject.CallbackUrl.Should().Be("http://example.com/auth");
             Subject.DomainHint.Should().Be("servicestack.net");
             Subject.ResourceId.Should().Be("r2d2");
+            Subject.FailureRedirectPath.Should().Be("/bad/news");
         }
 
         [Test]
@@ -113,6 +115,12 @@ namespace ServiceStack.Authentication.Aad.Tests
             Subject.ResourceId.Should().Be("00000002-0000-0000-c000-000000000000");
         }
 
+        [Test]
+        public void ShouldDefaultToRedirectToRootOnFailure()
+        {
+            Subject.FailureRedirectPath.Should().Be("/");
+        }
+
         // Tests based on examples at https://msdn.microsoft.com/en-us/library/azure/dn645542.aspx
 
         [Test]
@@ -123,9 +131,8 @@ namespace ServiceStack.Authentication.Aad.Tests
                 Subject.ClientId = "2d4d11a2-f814-46a7-890a-274a72a7309e";
                 Subject.CallbackUrl = "http://localhost/myapp/";
                 Subject.DomainHint = null;
-                var mockAuthService = MockAuthService();
 
-                var response = Subject.Authenticate(mockAuthService.Object, new AuthUserSession(), new Authenticate());
+                var response = Subject.Authenticate(MockAuthService().Object, new AuthUserSession(), new Authenticate());
 
                 var result = (IHttpResult) response;
                 result.Headers["Location"].Should().StartWith(
@@ -175,6 +182,27 @@ namespace ServiceStack.Authentication.Aad.Tests
                 var codeRequest = new Uri(result.Headers["Location"]);
                 var query = PclExportClient.Instance.ParseQueryString(codeRequest.Query);
                 query["domain_hint"].Should().Be(Subject.DomainHint);
+            }
+        }
+
+        [Test]
+        public void ShouldRedirectToFailurePathIfErrorIn()
+        {
+            // See https://tools.ietf.org/html/rfc6749#section-4.1.2.1
+            using (TestAppHost())
+            {
+                Subject.ClientId = "c1";
+                Subject.FailureRedirectPath = "/auth-failure";
+                var request = new MockHttpRequest("auth", "GET", "text", "/auth/foo?error=invalid_request", new NameValueCollection {{"error", "invalid_request"}}, Stream.Null, null);
+                var mockAuthService = MockAuthService(request);
+
+                var response = Subject.Authenticate(mockAuthService.Object, new AuthUserSession(), new Authenticate());
+
+                var result = (IHttpResult)response;
+                var redirectRequest = new Uri(result.Headers["Location"]);
+                redirectRequest.Should().Be("http://localhost/auth-failure");
+                //var query = PclExportClient.Instance.ParseQueryString(redirectRequest.Query);
+                //query["response_type"].Should().Be("code");
             }
         }
 

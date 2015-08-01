@@ -1,6 +1,7 @@
 ﻿using ServiceStack.Auth;
 using ServiceStack.Configuration;
 using ServiceStack.Text;
+using ServiceStack.Web;
 using System;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens;
@@ -65,6 +66,18 @@ namespace ServiceStack.Authentication.Aad
 
         public string[] Scopes { get; set; }
 
+        private string _failureRedirectPath;
+        public string FailureRedirectPath
+        {
+            get { return _failureRedirectPath; }
+            set
+            {
+                if (!value.StartsWith("/"))
+                    throw new FormatException("FailureRedirectPath should start with '/'");
+                _failureRedirectPath = value;
+            }
+        }
+
 
         public AadAuthProvider()
             : this(new AppSettings())
@@ -93,13 +106,21 @@ namespace ServiceStack.Authentication.Aad
             DomainHint = AppSettings.Get<string>("oauth.{0}.DomainHint".Fmt(Provider), null);
             ResourceId = AppSettings.Get("oauth.{0}.ResourceId".Fmt(Provider), "00000002-0000-0000-c000-000000000000");
             Scopes = AppSettings.Get("oauth.{0}.Scopes", new[] { "user_impersonation" });
+            FailureRedirectPath = AppSettings.Get("oauth.{0}.FailureRedirectPath".Fmt(Provider), "/");
         }
 
         protected override string GetReferrerUrl(IServiceBase authService, IAuthSession session, Authenticate request = null)
         {
-            // TODO: The base implementation should check the redirect param. Also this is interesting: http://english.stackexchange.com/questions/42630/referer-or-referrer
+            // TODO: The base implementation should check the redirect param.
             return authService.Request.GetParam("redirect") ??
                 base.GetReferrerUrl(authService, session, request);
+            // Note that most auth providers redirect to the referrer url upon failure.
+            // This implementation throws a monkey-wrench in that because we are here
+            // setting the referrer url to the secure (authentication required) resource.
+            // Thus redirecting to the referrer url on auth failure causes a redirect loop.
+            // Therefore this auth provider redirects to FailureRedirectPath
+            // The bottom line is that the user's destination should be different between success and failure
+            // and the base implementation does not naturally support that
         }
 
         public override object Authenticate(IServiceBase authService, IAuthSession session, Authenticate request)
@@ -125,7 +146,7 @@ namespace ServiceStack.Authentication.Aad
             if (hasError)
             {
                 Log.Error("AAD error callback. {0}".Fmt(httpRequest.QueryString["error_description"].UrlDecode()));
-                return authService.Redirect(FailedRedirectUrlFilter(this, session.ReferrerUrl.SetParam("f", error)));
+                return RedirectDueToFailure(authService, session, error);
             }
 
             // TODO: Can State property be added to IAuthSession
@@ -182,7 +203,7 @@ namespace ServiceStack.Authentication.Aad
                 if (!accessTokenError.IsNullOrEmpty())
                 {
                     Log.Error("access_token error callback. {0}".Fmt(authInfo.ToString()));
-                    return authService.Redirect(FailedRedirectUrlFilter(this, session.ReferrerUrl.SetParam("f", "AccessTokenFailed")));
+                    return RedirectDueToFailure(authService, session, "AccessTokenFailed");
                 }
                 tokens.AccessTokenSecret = authInfo["access_token"];
                 tokens.RefreshToken = authInfo["refresh_token"];
@@ -199,10 +220,10 @@ namespace ServiceStack.Authentication.Aad
                 // TODO: Error response is JSON. Can get error code and description
                 if (webException.IsBadRequest())
                 {
-                    return authService.Redirect(FailedRedirectUrlFilter(this, session.ReferrerUrl.SetParam("f", "AccessTokenFailed")));
+                    return RedirectDueToFailure(authService, session, "AccessTokenFailed");
                 }
             }
-            return authService.Redirect(FailedRedirectUrlFilter(this, session.ReferrerUrl.SetParam("f", "Unknown")));
+            return RedirectDueToFailure(authService, session, "Unknown");
         }
 
         protected override void LoadUserAuthInfo(AuthUserSession userSession, IAuthTokens tokens, Dictionary<string, string> authInfo)
@@ -254,6 +275,15 @@ namespace ServiceStack.Authentication.Aad
             userSession.Country = tokens.Country ?? userSession.Country;
             userSession.PrimaryEmail = tokens.Email ?? userSession.PrimaryEmail ?? userSession.Email;
             userSession.Email = tokens.Email ?? userSession.PrimaryEmail ?? userSession.Email;
+        }
+
+        protected IHttpResult RedirectDueToFailure(IServiceBase authService, IAuthSession session, string fparam)
+        {
+            var baseUrl = authService.Request.GetBaseUrl();
+            var destination = !FailureRedirectPath.IsNullOrEmpty() ? 
+                baseUrl + FailureRedirectPath :
+                session.ReferrerUrl ?? baseUrl;
+            return authService.Redirect(FailedRedirectUrlFilter(this, destination.SetParam("f", fparam)));
         }
     }
 }
