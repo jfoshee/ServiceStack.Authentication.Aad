@@ -133,36 +133,25 @@ namespace ServiceStack.Authentication.Aad
                 CallbackUrl = new Uri(authService.Request.AbsoluteUri).GetLeftPart(UriPartial.Path);
             var tokens = Init(authService, ref session, request);
             var httpRequest = authService.Request;
-
-            // 1. The client application starts the flow by redirecting the user agent 
-            //    to the Azure AD authorization endpoint. The user authenticates and 
-            //    consents, if consent is required.
             var query = httpRequest.QueryString.ToNameValueCollection();
             if (HasError(query))
                 return RedirectDueToFailure(authService, session, query);
 
-            // TODO: Can State property be added to IAuthSession
+            // 1. The client application starts the flow by redirecting the user agent 
+            //    to the Azure AD authorization endpoint. The user authenticates and 
+            //    consents, if consent is required.
+
+            // TODO: Can State property be added to IAuthSession to avoid this cast
             var userSession = session as AuthUserSession;
             if (userSession == null)
                 throw new NotSupportedException("Concrete dependence on AuthUserSession because of State property");
 
-            // STEP 1: Request Code
-            var code = httpRequest.QueryString["code"];
-            var isPreAuthCallback = !code.IsNullOrEmpty();
-            if (!isPreAuthCallback)
-            {
-                var state = Guid.NewGuid().ToString("N");
-                userSession.State = state;
-                var codeRequest = AuthorizeUrl + "?response_type=code&client_id={0}&redirect_uri={1}&scope={2}&state={3}"
-                    .Fmt(ClientId, CallbackUrl.UrlEncode(), Scopes.Join(","), state);
-                if (!DomainHint.IsNullOrEmpty())
-                    codeRequest += "&domain_hint=" + DomainHint;
-                authService.SaveSession(session, SessionExpiry);
-                return authService.Redirect(PreAuthUrlFilter(this, codeRequest));
-            }
+            var code = query["code"];
+            if (code.IsNullOrEmpty())
+                return RequestCode(authService, session, userSession);
 
-            var returnedState = httpRequest.QueryString["state"];
-            if (returnedState != userSession.State)
+            var state = query["state"];
+            if (state != userSession.State)
             {
                 session.IsAuthenticated = false;
                 throw new UnauthorizedAccessException("Mismatched state in code response.");
@@ -175,9 +164,25 @@ namespace ServiceStack.Authentication.Aad
             //    Azure AD token issuance endpoint. It presents the authorization code 
             //    to prove that the user has consented.
 
+            return RequestAccessToken(authService, session, code, tokens);
+        }
+
+        private object RequestCode(IServiceBase authService, IAuthSession session, AuthUserSession userSession)
+        {
+            var state = Guid.NewGuid().ToString("N");
+            userSession.State = state;
+            var codeRequest = AuthorizeUrl + "?response_type=code&client_id={0}&redirect_uri={1}&scope={2}&state={3}"
+                .Fmt(ClientId, CallbackUrl.UrlEncode(), Scopes.Join(","), state);
+            if (!DomainHint.IsNullOrEmpty())
+                codeRequest += "&domain_hint=" + DomainHint;
+            authService.SaveSession(session, SessionExpiry);
+            return authService.Redirect(PreAuthUrlFilter(this, codeRequest));
+        }
+
+        private IHttpResult RequestAccessToken(IServiceBase authService, IAuthSession session, string code, IAuthTokens tokens)
+        {
             try
             {
-                // STEP 2: Request Token
                 var formData = "client_id={0}&redirect_uri={1}&client_secret={2}&code={3}&grant_type=authorization_code&resource={4}"
                     .Fmt(ClientId.UrlEncode(), CallbackUrl.UrlEncode(), ClientSecret.UrlEncode(), code, ResourceId.UrlEncode());
                 // Endpoint only accepts posts requests
