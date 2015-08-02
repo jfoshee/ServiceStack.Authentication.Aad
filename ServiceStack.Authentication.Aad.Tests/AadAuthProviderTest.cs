@@ -153,7 +153,7 @@ namespace ServiceStack.Authentication.Aad.Tests
             {
                 Subject.ClientId = "c1";
                 var request = new MockHttpRequest("auth", "GET", "text", "/auth/foo/bar?redirect=" + "http://localhost/secure-resource".UrlEncode(), new NameValueCollection {
-                    // For some reason the following does not repro the problem: {"redirect", "http://localhost/secure-resource"},
+                    {"redirect", "http://localhost/secure-resource"},
                 }, Stream.Null, null);
                 var mockAuthService = MockAuthService(request);
 
@@ -182,6 +182,30 @@ namespace ServiceStack.Authentication.Aad.Tests
                 var codeRequest = new Uri(result.Headers["Location"]);
                 var query = PclExportClient.Instance.ParseQueryString(codeRequest.Query);
                 query["domain_hint"].Should().Be(Subject.DomainHint);
+            }
+        }
+
+        [Test]
+        public void ShouldUseLoginHintWhenUserNameKnown()
+        {
+            using (TestAppHost())
+            {
+                Subject.ClientId = "c1";
+                Subject.DomainHint = "domain.hint";
+                var tokens = new AuthTokens
+                {
+                    Provider = "aad",
+                    UserName = "user@example.com"
+                };
+                var session = new AuthUserSession();
+                session.ProviderOAuthAccess.Add(tokens);
+
+                var response = Subject.Authenticate(MockAuthService().Object, session, new Authenticate());
+
+                var result = (IHttpResult)response;
+                var codeRequest = new Uri(result.Headers["Location"]);
+                var query = PclExportClient.Instance.ParseQueryString(codeRequest.Query);
+                query["login_hint"].Should().Be(tokens.UserName);
             }
         }
 
@@ -449,7 +473,6 @@ namespace ServiceStack.Authentication.Aad.Tests
         // TODO: Should we request & verify a particular JWT signing algorithm?  https://auth0.com/blog/2015/03/31/critical-vulnerabilities-in-json-web-token-libraries/
         // TODO: Use the refresh token to request a new access token
         // TODO: Should not permit renewing token with different user
-        // TODO: Can provide login_hint in code request if renewing or we have user's email
         // TODO: Handle login with microsoft account or unexpected tenant (oid or upn is missing)
     }
 }

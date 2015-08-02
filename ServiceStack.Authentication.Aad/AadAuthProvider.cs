@@ -174,7 +174,7 @@ namespace ServiceStack.Authentication.Aad
 
             var code = query["code"];
             if (code.IsNullOrEmpty())
-                return RequestCode(authService, session, userSession);
+                return RequestCode(authService, session, userSession, tokens);
 
             var state = query["state"];
             if (state != userSession.State)
@@ -193,7 +193,7 @@ namespace ServiceStack.Authentication.Aad
             return RequestAccessToken(authService, session, code, tokens);
         }
 
-        private object RequestCode(IServiceBase authService, IAuthSession session, AuthUserSession userSession)
+        private object RequestCode(IServiceBase authService, IAuthSession session, AuthUserSession userSession, IAuthTokens tokens)
         {
             var state = Guid.NewGuid().ToString("N");
             userSession.State = state;
@@ -201,6 +201,8 @@ namespace ServiceStack.Authentication.Aad
                 .Fmt(ClientId, CallbackUrl.UrlEncode(), Scopes.Join(","), state);
             if (!DomainHint.IsNullOrEmpty())
                 codeRequest += "&domain_hint=" + DomainHint;
+            if (!tokens.UserName.IsNullOrEmpty())
+                codeRequest += "&login_hint=" + tokens.UserName;
             authService.SaveSession(session, SessionExpiry);
             return authService.Redirect(PreAuthUrlFilter(this, codeRequest));
         }
@@ -291,7 +293,7 @@ namespace ServiceStack.Authentication.Aad
             userSession.Email = tokens.Email ?? userSession.PrimaryEmail ?? userSession.Email;
         }
 
-        private bool HasError(NameValueCollection info)
+        private static bool HasError(NameValueCollection info)
         {
             return !(info["error"] ?? info["error_uri"] ?? info["error_description"]).IsNullOrEmpty();
         }
