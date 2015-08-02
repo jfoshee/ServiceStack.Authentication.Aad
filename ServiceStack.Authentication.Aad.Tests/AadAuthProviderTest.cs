@@ -448,7 +448,6 @@ namespace ServiceStack.Authentication.Aad.Tests
         // TODO: Can we validate the token comes from microsoft?
         // TODO: Should we request & verify a particular JWT signing algorithm?  https://auth0.com/blog/2015/03/31/critical-vulnerabilities-in-json-web-token-libraries/
         // TODO: Use the refresh token to request a new access token
-        // TODO: It is confusing that there is a CallbackUrl and a RedirectUrl
         // TODO: Should not permit renewing token with different user
         // TODO: Can provide login_hint in code request if renewing or we have user's email
         // TODO: Handle login with microsoft account or unexpected tenant (oid or upn is missing)

@@ -13,13 +13,28 @@ namespace ServiceStack.Authentication.Aad
 {
     /// <summary>
     /// Azure Active Directory (AAD) Auth Provider
-    /// You must provide the ClientId and ClientSecret.
+    /// </summary>
+    /// <remarks>
+    /// You must provide the `ClientId` and `ClientSecret`.
     /// They can be provided to the constructor, by setting the properties,
     /// or in the app.config appsettings under the following keys: 
     /// `oauth.aad.ClientId` and `oauth.aad.ClientSecret`
-    /// You may also provide the TenantId of your AAD resource.
-    /// See: https://msdn.microsoft.com/en-us/library/azure/dn645542.aspx
-    /// </summary>
+    /// 
+    /// You may also provide the `TenantId` of your AAD resource.
+    /// The Tenant ID can be found in the oauth2 endpoint as shown:
+    /// https://login.microsoftonline.com/{TenantId}/oauth2/token
+    /// If no Tenant ID is provided the `common` tenant will be used.
+    /// 
+    /// The `CallbackUrl` will default
+    /// to the /auth/aad path, but it can be configured explicitly. In either
+    /// case it must match what has been configured on Azure as a "REPLY URL".
+    /// 
+    /// The following properties are not used. If any are configured a warnnig
+    /// will be logged. This can be disabled with `LogConfigurationWarnings`.
+    /// - `RedirectUrl`
+    /// - `RequestTokenUrl`
+    /// </remarks>
+    /// <seealso href="https://msdn.microsoft.com/en-us/library/azure/dn645542.aspx"/>
     public class AadAuthProvider : OAuthProvider
     {
         public const string Name = "aad";
@@ -29,7 +44,7 @@ namespace ServiceStack.Authentication.Aad
         {
             get
             {
-                var tenantId = String.IsNullOrEmpty(TenantId) ? "common" : TenantId;
+                var tenantId = TenantId.IsNullOrEmpty() ? "common" : TenantId;
                 return Realm + tenantId + "/oauth2/";
             }
         }
@@ -46,7 +61,6 @@ namespace ServiceStack.Authentication.Aad
                 // control) navigates to a tenant-specific or common (tenant-independent) endpoint.
                 AuthorizeUrl = AppSettings.Get("oauth.{0}.AuthorizeUrl".Fmt(Provider), BaseAuthUrl + "authorize");
                 AccessTokenUrl = AppSettings.Get("oauth.{0}.AccessTokenUrl".Fmt(Provider), BaseAuthUrl + "token");
-                // TODO: Note that RequestTokenUrl is not used... 
             }
         }
 
@@ -79,6 +93,13 @@ namespace ServiceStack.Authentication.Aad
             }
         }
 
+        public static bool LogConfigurationWarnings { get; set; }
+        
+
+        static AadAuthProvider()
+        {
+            LogConfigurationWarnings = true;
+        }
 
         public AadAuthProvider()
             : this(new AppSettings())
@@ -108,6 +129,10 @@ namespace ServiceStack.Authentication.Aad
             ResourceId = AppSettings.Get("oauth.{0}.ResourceId".Fmt(Provider), "00000002-0000-0000-c000-000000000000");
             Scopes = AppSettings.Get("oauth.{0}.Scopes", new[] { "user_impersonation" });
             FailureRedirectPath = AppSettings.Get("oauth.{0}.FailureRedirectPath".Fmt(Provider), "/");
+            if (RedirectUrl != null && LogConfigurationWarnings)
+                Log.Warn("{0} auth provider does not use the RedirectUrl, but one has been configured.".Fmt(Provider));
+            if (RequestTokenUrl != null && LogConfigurationWarnings)
+                Log.Warn("{0} auth provider does not use the RequestTokenUrl, but one has been configured.".Fmt(Provider));
         }
 
         protected override string GetReferrerUrl(IServiceBase authService, IAuthSession session, Authenticate request = null)
@@ -126,6 +151,7 @@ namespace ServiceStack.Authentication.Aad
 
         public override object Authenticate(IServiceBase authService, IAuthSession session, Authenticate request)
         {
+            // TODO: WARN: Property 'redirect' does not exist on type 'ServiceStack.Authenticate'
             // TODO: WARN: Property 'code' does not exist on type 'ServiceStack.Authenticate'
             // TODO: WARN: Property 'session_state' does not exist on type 'ServiceStack.Authenticate'
             // TODO: The base Init() should strip the query string from the request URL
