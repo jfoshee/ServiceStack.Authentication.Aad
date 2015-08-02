@@ -471,8 +471,8 @@ namespace ServiceStack.Authentication.Aad.Tests
 
         // TODO: Can we validate the token comes from microsoft?
         // TODO: Should we request & verify a particular JWT signing algorithm?  https://auth0.com/blog/2015/03/31/critical-vulnerabilities-in-json-web-token-libraries/
-        // TODO: Use the refresh token to request a new access token
         // TODO: Should not permit renewing token with different user
-        // TODO: Handle login with microsoft account or unexpected tenant (oid or upn is missing)
+        // TODO: Use the refresh token to request a new access token (e.g. to another resource) https://msdn.microsoft.com/en-us/library/azure/dn645538.aspx
+        // TODO: If User logs in with wrong account, the next time they access auth/aad Microsoft will return the same auth as before... User will be stuck.
     }
 }

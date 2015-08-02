@@ -242,26 +242,60 @@ namespace ServiceStack.Authentication.Aad
             //return RedirectDueToFailure(authService, session, new NameValueCollection());
         }
 
-        protected override void LoadUserAuthInfo(AuthUserSession userSession, IAuthTokens tokens, Dictionary<string, string> authInfo)
+        public override IHttpResult OnAuthenticated(IServiceBase authService, IAuthSession session, IAuthTokens tokens, Dictionary<string, string> authInfo)
         {
             try
             {
                 // The id_token is a JWT token. See http://jwt.io
                 var jwt = new JwtSecurityToken(authInfo["id_token"]);
-                // TODO: Validate JWT is signed in expected way
-                
                 var p = jwt.Payload;
-                var tenantId = (string) p["tid"];
-                if (!String.IsNullOrEmpty(TenantId) && TenantId != tenantId)
+                var tenantId = (string)p["tid"];
+                if (!TenantId.IsNullOrEmpty() && TenantId != tenantId)
                 {
-                    userSession.IsAuthenticated = false;
-                    throw new UnauthorizedAccessException("Mismatched Tenant ID in JWT token");
+                    return RedirectDueToFailure(authService, session, new NameValueCollection
+                    {
+                        {"error", "mismatched-tenant"},
+                        {"error_description", "Mismatched Tenant ID in JWT token"}
+                    });
                 }
                 if (!p.Aud.Contains(ClientId))
                 {
-                    userSession.IsAuthenticated = false;
-                    throw new UnauthorizedAccessException("Mismatched Client ID in JWT token");
+                    return RedirectDueToFailure(authService, session, new NameValueCollection
+                    {
+                        {"error", "mismatched-client-app"},
+                        {"error_description", "Mismatched Client ID in JWT token"}
+                    });
                 }
+                if (!p.ContainsKey("oid") || !p.ContainsKey("upn"))
+                {
+                    return RedirectDueToFailure(authService, session, new NameValueCollection
+                    {
+                        {"error", "missing-user-id"},
+                        {"error_description", "Missing 'oid' or 'upn' in JWT token. " +
+                                              "This may imply the user logged into the wrong account. " +
+                                              "For example, the user may have logged into their Microsoft Account " +
+                                              "rather than their organizational account."}
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Reading JWT token", ex);
+                return RedirectDueToFailure(authService, session, new NameValueCollection
+                    {
+                        {"error", "bad-jwt"},
+                        {"error_description", "Problem checking the JWT token"}
+                    });                
+            }
+            return base.OnAuthenticated(authService, session, tokens, authInfo);
+        }
+
+        protected override void LoadUserAuthInfo(AuthUserSession userSession, IAuthTokens tokens, Dictionary<string, string> authInfo)
+        {
+            try
+            {
+                var jwt = new JwtSecurityToken(authInfo["id_token"]);
+                var p = jwt.Payload;
                 tokens.UserId = (string) p["oid"];
                 tokens.UserName = (string) p["upn"];
                 tokens.LastName = (string) p.GetValueOrDefault("family_name");
@@ -274,7 +308,7 @@ namespace ServiceStack.Authentication.Aad
             }
             catch (KeyNotFoundException ex)
             {
-                Log.Error("Could not retrieve user info at expected key", ex);
+                Log.Error("Reading user auth info from JWT", ex);
                 throw;
             }
             LoadUserOAuthProvider(userSession, tokens);
@@ -300,6 +334,7 @@ namespace ServiceStack.Authentication.Aad
 
         protected IHttpResult RedirectDueToFailure(IServiceBase authService, IAuthSession session, NameValueCollection errorInfo)
         {
+            session.IsAuthenticated = false;
             if (HasError(errorInfo))
                 Log.Error("{0} OAuth2 Error: '{1}' : \"{2}\" <{3}>".Fmt(
                     Provider,
