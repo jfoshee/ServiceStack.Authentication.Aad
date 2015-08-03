@@ -131,7 +131,7 @@ namespace ServiceStack.Authentication.Aad
             FailureRedirectPath = AppSettings.Get("oauth.{0}.FailureRedirectPath".Fmt(Provider), "/");
             if (RedirectUrl != null && LogConfigurationWarnings)
                 Log.Warn("{0} auth provider does not use the RedirectUrl, but one has been configured.".Fmt(Provider));
-            if (RequestTokenUrl != null && LogConfigurationWarnings)
+            if (RequestTokenUrl != Realm + "oauth/request_token" && LogConfigurationWarnings)
                 Log.Warn("{0} auth provider does not use the RequestTokenUrl, but one has been configured.".Fmt(Provider));
         }
 
