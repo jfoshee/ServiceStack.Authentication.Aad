@@ -1,12 +1,13 @@
 # ServiceStack.Authentication.Aad
 
 [![Build status](https://ci.appveyor.com/api/projects/status/np8eund073tvdrvn?svg=true)](https://ci.appveyor.com/project/jfoshee/servicestack-authentication-aad)
+[![NuGet pacakge](https://img.shields.io/nuget/v/ServiceStack.Authentication.Aad.svg)](https://www.nuget.org/packages/ServiceStack.Authentication.Aad)
 
 Azure Active Directory Authentication plugin for ServiceStack
 
-## Usage
+## `AadAuthProvider` Usage
 
-Construct an  `AadAuthProvider` and pass it to your `AuthFeature` plugin 
+Construct an  **`AadAuthProvider`** and pass it to your `AuthFeature` plugin 
 (along with any other auth providers you may have) inside `AppHost.Configure`.
 
     public class AppHost : AppSelfHostBase
