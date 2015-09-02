@@ -29,7 +29,7 @@ namespace ServiceStack.Authentication.Aad
     /// to the /auth/aad path, but it can be configured explicitly. In either
     /// case it must match what has been configured on Azure as a "REPLY URL".
     /// 
-    /// The following properties are not used. If any are configured a warnnig
+    /// The following properties are not used. If any are configured a warning
     /// will be logged. This can be disabled with `LogConfigurationWarnings`.
     /// - `RedirectUrl`
     /// - `RequestTokenUrl`

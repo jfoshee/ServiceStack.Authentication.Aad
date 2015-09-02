@@ -1,12 +1,19 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 2013
-VisualStudioVersion = 12.0.31101.0
+# Visual Studio 14
+VisualStudioVersion = 14.0.23107.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ServiceStack.Authentication.Aad", "ServiceStack.Authentication.Aad\ServiceStack.Authentication.Aad.csproj", "{5E60FB72-6E9B-4A15-85A5-C2F192F27952}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ServiceStack.Authentication.Aad.Tests", "ServiceStack.Authentication.Aad.Tests\ServiceStack.Authentication.Aad.Tests.csproj", "{483AF7BE-AC38-4C6C-A798-6F69EE6F6801}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ServiceStack.Authentication.Aad.SelfHostTest", "ServiceStack.Authentication.Aad.SelfHostTest\ServiceStack.Authentication.Aad.SelfHostTest.csproj", "{EA80C452-414C-4481-9C1D-17B8CB7D262C}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{E82D8008-B8C6-43C9-95F9-F8ECC1983EDB}"
+	ProjectSection(SolutionItems) = preProject
+		.gitignore = .gitignore
+		LICENSE = LICENSE
+		README.md = README.md
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
