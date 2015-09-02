@@ -1,4 +1,4 @@
-# ServiceStack.Authentication.Aad
+# <img src="Icon.jpeg" width="51" height="40" >  ServiceStack.Authentication.Aad
 
 [![Build status](https://ci.appveyor.com/api/projects/status/np8eund073tvdrvn?svg=true)](https://ci.appveyor.com/project/jfoshee/servicestack-authentication-aad)
 [![NuGet package](https://img.shields.io/nuget/v/ServiceStack.Authentication.Aad.svg)](https://www.nuget.org/packages/ServiceStack.Authentication.Aad)
