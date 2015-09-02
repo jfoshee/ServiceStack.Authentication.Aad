@@ -16,7 +16,7 @@ when organizations are using Office 365 or a custom AAD resource.
 
 ### Office 365
 
-If you are want to enable authentication for an Office365 domain, navigate to your [Office 365 Admin Center](https://portal.office.com/admin/default.aspx). 
+If you want to enable authentication for an Office365 domain, navigate to your [Office 365 Admin Center](https://portal.office.com/admin/default.aspx). 
 At the bottom left, under "ADMIN" click "Azure AD". That should take you to something like: `https://manage.windowsazure.com/{my organization}.com`
 Visiting the AAD administration for Office365 the first time may take a moment to setup.
 
