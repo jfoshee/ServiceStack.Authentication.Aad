@@ -8,7 +8,7 @@
     <owners>$author$</owners>
     <licenseUrl>https://github.com/jfoshee/ServiceStack.Authentication.Aad/blob/master/LICENSE</licenseUrl>
     <projectUrl>https://github.com/jfoshee/ServiceStack.Authentication.Aad</projectUrl>
-    <iconUrl>https://github.com/jfoshee/ServiceStack.Authentication.Aad/blob/master/Icon.jpeg</iconUrl>
+    <iconUrl>https://raw.githubusercontent.com/jfoshee/ServiceStack.Authentication.Aad/master/Icon.jpeg</iconUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>$description$</description>
     <releaseNotes>Alpha</releaseNotes>
