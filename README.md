@@ -1,7 +1,7 @@
 # ServiceStack.Authentication.Aad
 
 [![Build status](https://ci.appveyor.com/api/projects/status/np8eund073tvdrvn?svg=true)](https://ci.appveyor.com/project/jfoshee/servicestack-authentication-aad)
-[![NuGet pacakge](https://img.shields.io/nuget/v/ServiceStack.Authentication.Aad.svg)](https://www.nuget.org/packages/ServiceStack.Authentication.Aad)
+[![NuGet package](https://img.shields.io/nuget/v/ServiceStack.Authentication.Aad.svg)](https://www.nuget.org/packages/ServiceStack.Authentication.Aad)
 
 Azure Active Directory Authentication plugin for ServiceStack
 
@@ -12,6 +12,8 @@ when organizations are using Office 365 or a custom AAD resource.
 
 ## Azure Configuration
 
+<img src="./documentation/Office 365 Admin Center.PNG" align=right width="110" height="428" >
+
 ### Office 365
 
 If you are want to enable authentication for an Office365 domain, navigate to your [Office 365 Admin Center](https://portal.office.com/admin/default.aspx). 
@@ -20,21 +22,29 @@ Visiting the AAD administration for Office365 the first time may take a moment t
 
 ### Add App to AAD
 
-Navigate to your Azure Active Directory and select the Applications tab
+Navigate to your Azure Active Directory and select the Applications tab.
 
-At the bottom click "ADD" then select "Add an application my organization is developing"
+<img src="./documentation/AAD Applications.PNG" width="360" height="228" >
+
+At the bottom click "ADD" then select "Add an application my organization is developing".
 
 Give the application a readable name, select Web application and click the next arrow.
+
+<img src="./documentation/1 Tell us about your app.PNG" width="314" height="225" >
+<img src="./documentation/2 Add app urls.PNG" width="314" height="225" >
 
 #### Tenant ID
 
 Click "VIEW ENDPOINTS" at the bottom of your app's quick-start page. 
+
+<img src="./documentation/App endpoints.PNG" width="246" height="307" >
+
 The AadAuthProvider will be using the two OAuth2 endpoints at the bottom.
 The AadAuthProvider assumes they have the following format:  
-https://login.microsoftonline.com/00000000-1111-2222-3333-444444444444/oauth2/token  
-https://login.microsoftonline.com/00000000-1111-2222-3333-444444444444/oauth2/authorize
+`https://login.microsoftonline.com/00000000-1111-2222-3333-444444444444/oauth2/token`  
+`https://login.microsoftonline.com/00000000-1111-2222-3333-444444444444/oauth2/authorize`
 
-Your Tenant ID is the UID in the middle of the URL: https://login.microsoftonline.com/{TenantID}/oauth2/token 
+Your Tenant ID is the UID in the middle of the URL: `https://login.microsoftonline.com/{TenantID}/oauth2/token` 
 You should retain it for later.
 
 ##### Endpoints
@@ -46,15 +56,21 @@ using the appSettings keys `oauth.aad.AccessTokenUrl` and `oauth.aad.AuthorizeUr
 
 Select the CONFIGURE tab and scroll down to find your Client ID. Retain the Client ID for configuration.
 
+<img src="./documentation/3 Configure Client ID.PNG" width="480" height="347" >
+
 #### Client Secret
 
 Under "keys" drop-down the "Select duration" box to pick a 1 or 2 year key lifetime.
+
+<img src="./documentation/4 Select key duration.PNG" width="348" height="92" >
 
 Under "single sign-on" you must supply a "REPLY URL" for each unique URL that will act as an OAuth2 callback. 
 The ServiceStack convention is base URL + `/auth/aad`.
 So for testing you should add: `http://localhost:1234/auth/aad` (using an obscure port number)
 And for your live site you should add: `http://example.com/auth/aad` (using https if applicable)
 You can remove the default reply URL if it will not be used as an OAuth2 callback.
+
+<img src="./documentation/5 Save Configuration with client key.PNG" width="452" height="338" >
 
 Finally, click SAVE at the bottom of the CONFIGURE page. After a few seconds the changes should be saved and the new key will be displayed.
 Copy and retain the key as the Client Secret (aka Consumer Secret).
@@ -64,6 +80,7 @@ Copy and retain the key as the Client Secret (aka Consumer Secret).
 Clearly you can also provide an icon for your app.  When your users browse to https://portal.office.com/myapps they will see your custom app 
 along with the other Office apps. When they click on your app they will be sent to the configured "SIGN-ON URL".
 
+<img src="./documentation/My Office Apps.PNG" width="452" height="338" >
 
 
 ## `AadAuthProvider` Usage
