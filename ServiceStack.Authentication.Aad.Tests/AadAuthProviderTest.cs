@@ -455,14 +455,6 @@ namespace ServiceStack.Authentication.Aad.Tests
             }
         }
 
-        [Test]
-        public void ShouldHavePageWithSignoutLinks()
-        {
-            var html = AadAuthProvider.MicrosoftLogoutHtml();
-            html.Should().Contain("https://login.microsoftonline.com/logout.srf")
-                .And.Contain("https://outlook.office365.com/owa/logoff.owa");
-        }
-
         private static Mock<IServiceBase> MockAuthService(MockHttpRequest request = null)
         {
             request = request ?? new MockHttpRequest();
@@ -481,6 +473,5 @@ namespace ServiceStack.Authentication.Aad.Tests
         // TODO: Should we request & verify a particular JWT signing algorithm?  https://auth0.com/blog/2015/03/31/critical-vulnerabilities-in-json-web-token-libraries/
         // TODO: Should not permit renewing token with different user
         // TODO: Use the refresh token to request a new access token (e.g. to another resource) https://msdn.microsoft.com/en-us/library/azure/dn645538.aspx
-        // TODO: Investigate logging out with correct client id https://login.live.com/oauth20_logout.srf?client_id={client_id}&redirect_uri={redirect_uri}
     }
 }

@@ -254,14 +254,20 @@ namespace ServiceStack.Authentication.Aad
         }
 
         /// <summary>
-        /// Returns text for a page with links to sign out of Microsoft accounts
+        /// Returns a redirect result to a Microsoft logout page
         /// </summary>
-        public static string MicrosoftLogoutHtml()
+        public IHttpResult RedirectToMicrosoftLogout(IServiceBase authService)
         {
-            var path = "microsoft-logout.html";
-            var logoutPageStream = Assembly.GetExecutingAssembly().GetManifestResourceStream(typeof(AadAuthProvider), path);
-            var bytes = logoutPageStream.ReadFully();
-            return Encoding.UTF8.GetString(bytes);
+            // See https://msdn.microsoft.com/en-us/office/office365/howto/authentication-v2-protocols
+            var request = BaseAuthUrl + "/logout?client_id={1}&post_logout_redirect_uri={2}"
+                .Fmt(TenantId, ClientId, CallbackUrl.UrlEncode());
+            return authService.Redirect(LogoutUrlFilter(this, request));
+        }
+
+        public override object Logout(IServiceBase service, Authenticate request)
+        {
+            base.Logout(service, request);
+            return RedirectToMicrosoftLogout(service);
         }
 
         public override IHttpResult OnAuthenticated(IServiceBase authService, IAuthSession session, IAuthTokens tokens, Dictionary<string, string> authInfo)
@@ -302,7 +308,8 @@ namespace ServiceStack.Authentication.Aad
                     // If the user selected "Keep me signed in" they will effectively be stuck
                     // Because Microsoft will continue to send us the same token without prompting
                     // the user for other credentials.
-                    return new HttpResult(MicrosoftLogoutHtml(), "text/html");
+                    // TODO: It would be nice to momentarily show the user a message explaining why they are being signed out
+                    return RedirectToMicrosoftLogout(authService);
                 }
             }
             catch (Exception ex)

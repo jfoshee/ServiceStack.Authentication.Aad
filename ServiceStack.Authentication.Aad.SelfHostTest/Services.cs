@@ -9,7 +9,17 @@
 
         public object Any(SecureResourceRequest request)
         {
-            return "Success!";
+            var html = @"
+<html><body>
+<p>
+Success!  You are looking at a secure resource.
+</p>
+<p>
+<a href='/auth/logout'>Sign out</a>
+</p>
+</body></html>
+";
+            return new HttpResult(html, "text/html");
         }
     }
 }
