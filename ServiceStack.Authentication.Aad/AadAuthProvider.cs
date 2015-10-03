@@ -6,7 +6,9 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.IdentityModel.Tokens;
+using System.IO;
 using System.Net;
+using System.Reflection;
 using System.Text;
 
 namespace ServiceStack.Authentication.Aad
@@ -232,6 +234,15 @@ namespace ServiceStack.Authentication.Aad
             }
             catch (WebException webException)
             {
+                if (webException.Response == null)
+                {
+                    // This could happen e.g. due to a timeout
+                    return RedirectDueToFailure(authService, session, new NameValueCollection
+                    {
+                        {"error", webException.GetType().ToString()},
+                        {"error_description", webException.Message}
+                    });
+                }
                 Log.Error("Auth Failure", webException);
                 var response = ((HttpWebResponse) webException.Response);
                 var responseText = Encoding.UTF8.GetString(
@@ -240,6 +251,17 @@ namespace ServiceStack.Authentication.Aad
                 return RedirectDueToFailure(authService, session, errorInfo);
             }
             //return RedirectDueToFailure(authService, session, new NameValueCollection());
+        }
+
+        /// <summary>
+        /// Returns text for a page with links to sign out of Microsoft accounts
+        /// </summary>
+        public static string MicrosoftLogoutHtml()
+        {
+            var path = "microsoft-logout.html";
+            var logoutPageStream = Assembly.GetExecutingAssembly().GetManifestResourceStream(typeof(AadAuthProvider), path);
+            var bytes = logoutPageStream.ReadFully();
+            return Encoding.UTF8.GetString(bytes);
         }
 
         public override IHttpResult OnAuthenticated(IServiceBase authService, IAuthSession session, IAuthTokens tokens, Dictionary<string, string> authInfo)
@@ -268,7 +290,7 @@ namespace ServiceStack.Authentication.Aad
                 }
                 if (!p.ContainsKey("oid") || !p.ContainsKey("upn"))
                 {
-                    return RedirectDueToFailure(authService, session, new NameValueCollection
+                    FailAndLogError(session, new NameValueCollection
                     {
                         {"error", "missing-user-id"},
                         {"error_description", "Missing 'oid' or 'upn' in JWT token. " +
@@ -276,6 +298,11 @@ namespace ServiceStack.Authentication.Aad
                                               "For example, the user may have logged into their Microsoft Account " +
                                               "rather than their organizational account."}
                     });
+                    // Here we really need to give the user a way to sign out of their MS account
+                    // If the user selected "Keep me signed in" they will effectively be stuck
+                    // Because Microsoft will continue to send us the same token without prompting
+                    // the user for other credentials.
+                    return new HttpResult(MicrosoftLogoutHtml(), "text/html");
                 }
             }
             catch (Exception ex)
@@ -334,6 +361,17 @@ namespace ServiceStack.Authentication.Aad
 
         protected IHttpResult RedirectDueToFailure(IServiceBase authService, IAuthSession session, NameValueCollection errorInfo)
         {
+            FailAndLogError(session, errorInfo);
+            var baseUrl = authService.Request.GetBaseUrl();
+            var destination = !FailureRedirectPath.IsNullOrEmpty() ? 
+                baseUrl + FailureRedirectPath :
+                session.ReferrerUrl ?? baseUrl;
+            var fparam = errorInfo["error"] ?? "Unknown";
+            return authService.Redirect(FailedRedirectUrlFilter(this, destination.SetParam("f", fparam)));
+        }
+
+        private void FailAndLogError(IAuthSession session, NameValueCollection errorInfo)
+        {
             session.IsAuthenticated = false;
             if (HasError(errorInfo))
                 Log.Error("{0} OAuth2 Error: '{1}' : \"{2}\" <{3}>".Fmt(
@@ -343,12 +381,6 @@ namespace ServiceStack.Authentication.Aad
                     errorInfo["error_uri"].UrlDecode()));
             else
                 Log.Error("Unknown {0} OAuth2 Error".Fmt("Provider"));
-            var baseUrl = authService.Request.GetBaseUrl();
-            var destination = !FailureRedirectPath.IsNullOrEmpty() ? 
-                baseUrl + FailureRedirectPath :
-                session.ReferrerUrl ?? baseUrl;
-            var fparam = errorInfo["error"] ?? "Unknown";
-            return authService.Redirect(FailedRedirectUrlFilter(this, destination.SetParam("f", fparam)));
         }
     }
 }
