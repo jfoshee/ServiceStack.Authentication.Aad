@@ -129,7 +129,7 @@ namespace ServiceStack.Authentication.Aad
             TenantId = AppSettings.Get<string>("oauth.{0}.TenantId".Fmt(Provider), null);
             DomainHint = AppSettings.Get<string>("oauth.{0}.DomainHint".Fmt(Provider), null);
             ResourceId = AppSettings.Get("oauth.{0}.ResourceId".Fmt(Provider), "00000002-0000-0000-c000-000000000000");
-            Scopes = AppSettings.Get("oauth.{0}.Scopes", new[] { "user_impersonation" });
+            Scopes = AppSettings.Get("oauth.{0}.Scopes".Fmt(Provider), new[] { "user_impersonation" });
             FailureRedirectPath = AppSettings.Get("oauth.{0}.FailureRedirectPath".Fmt(Provider), "/");
             if (RedirectUrl != null && LogConfigurationWarnings)
                 Log.Warn("{0} auth provider does not use the RedirectUrl, but one has been configured.".Fmt(Provider));
