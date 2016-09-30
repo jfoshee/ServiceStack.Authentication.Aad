@@ -259,8 +259,8 @@ namespace ServiceStack.Authentication.Aad
         public IHttpResult RedirectToMicrosoftLogout(IServiceBase authService)
         {
             // See https://msdn.microsoft.com/en-us/office/office365/howto/authentication-v2-protocols
-            var request = BaseAuthUrl + "{0}/logout?client_id={1}&post_logout_redirect_uri={2}"
-                .Fmt(TenantId, ClientId, CallbackUrl.UrlEncode());
+            var request = "{0}logout?client_id={1}&post_logout_redirect_uri={2}"
+                .Fmt(BaseAuthUrl, ClientId, CallbackUrl.UrlEncode());
             return authService.Redirect(LogoutUrlFilter(this, request));
         }
 
