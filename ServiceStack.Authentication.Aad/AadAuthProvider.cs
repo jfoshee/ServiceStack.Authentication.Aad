@@ -216,7 +216,7 @@ namespace ServiceStack.Authentication.Aad
                 var formData = "client_id={0}&redirect_uri={1}&client_secret={2}&code={3}&grant_type=authorization_code&resource={4}"
                     .Fmt(ClientId.UrlEncode(), CallbackUrl.UrlEncode(), ClientSecret.UrlEncode(), code, ResourceId.UrlEncode());
                 // Endpoint only accepts posts requests
-                var contents = AccessTokenUrl.PostToUrl(formData);
+                var contents = AccessTokenUrl.PostToUrl(PreAuthUrlFilter(this, formData));
 
                 // 4. The Azure AD token issuance endpoint returns an access token 
                 //    and a refresh token. The refresh token can be used to request 
