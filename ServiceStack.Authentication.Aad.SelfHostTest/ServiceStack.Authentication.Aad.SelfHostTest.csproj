@@ -70,7 +70,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ServiceStack.Authentication.Aad\ServiceStack.Authentication.Aad.csproj">
-      <Project>{5E60FB72-6E9B-4A15-85A5-C2F192F27952}</Project>
+      <Project>{aa1e396c-1729-4493-8369-56f84e23390b}</Project>
       <Name>ServiceStack.Authentication.Aad</Name>
     </ProjectReference>
   </ItemGroup>
