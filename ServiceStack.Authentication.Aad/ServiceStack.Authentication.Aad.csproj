@@ -3,6 +3,21 @@
     <TargetFrameworks>net451;netstandard2.0</TargetFrameworks>
     <FileUpgradeFlags>0</FileUpgradeFlags>
     <OldToolsVersion>2.0</OldToolsVersion>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <Description>Azure Active Directory Authentication plugin for ServiceStack
+
+The AadAuthProvider is a great way to add Microsoft organizational authentication 
+to some or all of your ServiceStack web site or services.
+Azure Active Directory (AAD or formerly WAAD) enables login to custom apps 
+when organizations are using Office 365 or a custom AAD resource.</Description>
+    <PackageLicenseUrl>https://github.com/jfoshee/ServiceStack.Authentication.Aad/blob/master/LICENSE</PackageLicenseUrl>
+    <Copyright>Copyright 2015 - 2018, Jacob Foshee</Copyright>
+    <PackageProjectUrl>https://github.com/jfoshee/ServiceStack.Authentication.Aad</PackageProjectUrl>
+    <PackageIconUrl>https://raw.githubusercontent.com/jfoshee/ServiceStack.Authentication.Aad/master/Icon.jpeg</PackageIconUrl>
+    <RepositoryUrl>https://github.com/jfoshee/ServiceStack.Authentication.Aad</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>ServiceStack AAD Azure Active Directory</PackageTags>
+    <PackageReleaseNotes>ServiceStack 5</PackageReleaseNotes>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="ServiceStack" Version="5.0.2" />
