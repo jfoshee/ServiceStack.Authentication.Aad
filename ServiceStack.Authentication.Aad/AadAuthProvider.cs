@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
 using System.IO;
 using System.Net;
 using System.Reflection;
@@ -161,7 +162,7 @@ namespace ServiceStack.Authentication.Aad
                 CallbackUrl = new Uri(authService.Request.AbsoluteUri).GetLeftPart(UriPartial.Path);
             var tokens = Init(authService, ref session, request);
             var httpRequest = authService.Request;
-            var query = httpRequest.QueryString.ToNameValueCollection();
+            var query = httpRequest.QueryString;
             if (HasError(query))
                 return RedirectDueToFailure(authService, session, query);
 
